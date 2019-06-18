@@ -1,0 +1,8 @@
+sudo defaults write /var/db/locationd/Library/Preferences/ByHost/com.apple.locationd LocationServicesEnabled -int 1
+chown -R _locationd:_locationd /var/db/locationd
+sudo /usr/bin/defaults write /Library/Preferences/com.apple.timezone.auto Active -bool YES
+sudo /usr/bin/defaults write /private/var/db/timed/Library/Preferences/com.apple.timed.plist TMAutomaticTimeOnlyEnabled -bool YES
+sudo /usr/bin/defaults write /private/var/db/timed/Library/Preferences/com.apple.timed.plist TMAutomaticTimeZoneEnabled -bool YES
+sudo /usr/sbin/systemsetup -setusingnetworktime on
+sudo /usr/sbin/systemsetup -gettimezone
+sudo /usr/sbin/systemsetup -getnetworktimeserver
