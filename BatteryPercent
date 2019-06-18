@@ -1,0 +1,6 @@
+#Get current logged in user
+cU=`ls -l /dev/console | cut -d " " -f4`
+#Enable battery percent
+sudo -u $cU defaults write com.apple.menuextra.battery ShowPercent YES
+#Stop GUI service to refresh and apply changes. Screen may flash very briefly
+sudo -u $cU killall SystemUIServer
