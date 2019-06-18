@@ -1,0 +1,35 @@
+#!/bin/bash
+#Provide Instructions to the User
+Echo _____________________________________________________
+Echo "Please note spaces and capitols matter. Quotes are optional"
+Echo "Do not include /Applications/" or .app
+echo "You can copy/paste from the below list"
+echo _____________________________________________________
+
+# Poll and print current items on dock ro user
+defaults read com.apple.dock persistent-apps | grep file-label | cut -d "=" -f2 | sed 's/;$//'
+#Get selection from User
+Echo "Which Application you would like removed from the dock?"
+read app
+Clear
+
+#Turn .app name ($app) into a numerical position on dock
+dloc=$(defaults read com.apple.dock persistent-apps | grep file-label | awk /"$app"/'  {printf NR}')
+
+#If there is a duplicate on dock it will print both positions. Trim down to last two numbers.
+#will glitch if more than 99 dock items. 
+#will glitch if duplicates are of the first 10 positions. Need to further develop this bug net
+dloc=$(echo $dloc |tail -c 3)
+
+#com.apple.dock reads from 0. This prevents wrong app from being deleted
+dloc=$((dloc - 1))
+# If the app doesn't exist dloc remains 0. Thus this condition checks if app exists on dock.
+if [ "$dloc" -ge 0 ] 
+then
+/usr/libexec/PlistBuddy -c "Delete persistent-apps:$dloc" ~/Library/Preferences/com.apple.dock.plist
+# Refresh dock to show changes
+Killall Dock
+else
+#Conditional failure. Script exit
+echo "Does not exist. Plese try again"
+fi
