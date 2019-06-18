@@ -1,0 +1,44 @@
+#!/bin/bash
+#Provide Instructions to the User
+Echo _____________________________________________________
+Echo "Please note spaces matter, not case sensitive*"
+echo "You can copy/paste from the below list"
+echo "*Folders* are case sensitive such as Utilities"
+Echo "Do not include /Applications/"
+echo _____________________________________________________
+
+#Poll and Print /Applicaitons/ Folder to User
+Echo "What Application you would like added to the dock?"
+ls /Applications/ | column -c 80
+# get selection from user
+read app
+Clear
+# Select app or enter folder
+## Will glitch with nested folders, maybe this should be a loop with break condition
+## 1. check last four character for ".app"
+test=$(echo "$app" | tail -c 5)
+if [ $test != '.app' ]
+then
+app=/Applications/"$app"
+# Not equal test true, display contents of folder and ask for app again 
+echo ____________________________________________
+Echo "Which would you like added to the dock?"
+echo "You can copy/paste from the below list"
+echo ____________________________________________
+ls "$app" | column -c 80
+read app1
+app="$app"/$app1
+# Not equal test false, set app variable
+else
+app=/Applications/"$app"
+fi
+# Check if $app now references a valid directory. .app in mac are seen as directories
+if [ -d "$app" ]
+then
+# Rewrite the dock and restart Dock to reflect changes
+defaults write com.apple.dock persistent-apps -array-add '<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>'"$app"'</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>'
+killall Dock
+# Not a valid directory script exits.
+else
+Echo "Does not exist. Please try again"
+fi
