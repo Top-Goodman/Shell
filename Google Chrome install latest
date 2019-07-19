@@ -16,7 +16,7 @@
 #	Version: 1.0
 #
 #	- Joe Farage, 17.03.2015
-#   - v.1.1 Spencer, 19.07.2019: edited to ignore CPU architecture for non-intel based Macs in 2020
+#   - v.1.1 Top-Goodman, 19.07.2019: edited to ignore CPU architecture for non-intel based Macs in 2020
 #    Also gathering a little bit more info for the logs,
 #
 ####################################################################################################
