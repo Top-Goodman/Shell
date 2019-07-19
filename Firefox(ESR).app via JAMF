@@ -63,7 +63,7 @@ if [ -e "/Applications/Firefox.app" ]; then
     currentinstalledver=$(/usr/bin/defaults read /Applications/Firefox.app/Contents/Info CFBundleShortVersionString)
     /bin/echo "Current installed version is: $currentinstalledver"
     if [ ${ver} = ${currentinstalledver} ]; then
-        /binecho "Firefox ESR is current. Exiting"
+        /bin/echo "Firefox ESR is current. Exiting"
         exit 0
     fi
     else
