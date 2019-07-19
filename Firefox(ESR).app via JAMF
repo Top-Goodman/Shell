@@ -1,0 +1,126 @@
+#!/bin/sh
+#####################################################################################################
+#
+# ABOUT THIS PROGRAM
+#
+# NAME
+#   FirefoxESRInstall.sh -- Installs or updates Firefox ESR
+#
+# SYNOPSIS
+#   sudo FirefoxESRInstall.sh
+#
+####################################################################################################
+#
+# HISTORY
+#
+#   Version: 1.1
+#
+#   - v.1.0 Joe Farage, 18.03.2015
+#   - v.1.1 Deej, 10.11.2017: forked for Mozilla Firefox ESR
+#   - v.1.2 Top-Goodman, 19.07.2019: edited to ignore CPU architecture for non-intel based Macs in 2020
+#    as well as other changes for multi release/choose release functinoality
+#
+####################################################################################################
+
+# Script to download and install Firefox ESR.
+
+# choose language (en-US, fr, de)
+lang=""
+ver=""
+# CHECK TO SEE IF A VALUE WAS PASSED IN JAMF to PARAMETER 1 AND, IF SO, ASSIGN TO "lang"
+if [ "$4" != "" ] && [ "$lang" == "" ]; then
+    lang=$4
+    else
+    lang="en-US"
+fi
+
+if [[ "$5" =~ ^[0-9]*\.[0-9]*(\.[0-9])*$ ]]; then
+    if [ "$5" != "" ] && [ "$ver" == "" ]; then
+    ver=$5
+    fi
+fi 
+
+dmgfile="/tmp/FF.dmg"
+logfile="/Library/Logs/FirefoxESRInstallScript.log"
+        /bin/echo "`date`: Target Firefox ESR version: ${ver}" >> ${logfile}
+#OSvers_URL=$(sw_vers -productVersion | sed 's/[.]/_/g')
+#userAgent="Mozilla/5.0 (Macintosh; Intel Mac OS X ${OSvers_URL}) AppleWebKit/535.6.2 (KHTML, like Gecko) Version/5.2 Safari/535.6.2"
+# Get the latest version of Firefox ESR available from Firefox page. AWK at end set to $1 will grab advertised version, set to $2 will grab an alternate advertised version if it exists.
+#latestver=$(/usr/bin/curl -s https://www.mozilla.org/${lang}/firefox/new/ | grep 'data-esr-versions' | sed -e 's/.* data-esr-versions="\(.*\)".*/\1/' -e 's/\"//' | /usr/bin/awk '{print $2}')
+#Testing latestver
+#if ! [[ $latestver =~ ^[0-9]*\.[0-9]*(\.[0-9])*$ ]]; then
+    latestver=$(/usr/bin/curl -s https://www.mozilla.org/${lang}/firefox/new/ | grep 'data-esr-versions' | sed -e 's/.* data-esr-versions="\(.*\)".*/\1/' -e 's/\"//' | /usr/bin/awk '{print $1}')
+    /bin/echo "Latest Version is: $latestver"
+#fi
+
+if [ "$ver" == "" ]; then
+ver=$latestver
+fi
+/bin/echo "Target Version is: $ver"
+
+# Get the version number of the currently-installed FF, if any.
+if [ -e "/Applications/Firefox.app" ]; then
+    currentinstalledver=$(/usr/bin/defaults read /Applications/Firefox.app/Contents/Info CFBundleShortVersionString)
+    /bin/echo "Current installed version is: $currentinstalledver"
+    if [ ${ver} = ${currentinstalledver} ]; then
+        /binecho "Firefox ESR is current. Exiting"
+        exit 0
+    fi
+    else
+    currentinstalledver="none"
+    /bin/echo "Firefox ESR is not installed"
+fi
+
+
+    url="https://download-installer.cdn.mozilla.net/pub/firefox/releases/${ver}esr/mac/${lang}/Firefox%20${ver}esr.dmg"
+
+    /bin/echo "Latest version of the URL is: $url"
+    /bin/echo "`date`: Download URL: $url" >> ${logfile}
+
+
+    # Compare the two versions, if they are different or Firefox is not present then download and install the new version.
+    if [ "${currentinstalledver}" != "${ver}" ]; then
+        /bin/echo "`date`: Current Firefox ESR version: ${currentinstalledver}" >> ${logfile}
+        /bin/echo "`date`: Target Firefox ESR version: ${ver}" >> ${logfile}
+        /bin/echo "`date`: Downloading targetted version." >> ${logfile}
+        /usr/bin/curl -s -o ${dmgfile} ${url}
+        if [ $(find ${dmgfile} -size -1k) ]; then
+        /bin/echo "Invalid or Non-Existant version specified: $ver."
+        /bin/echo "`date`:Invalid or Non-Existant version specified: $ver" >> ${logfile}
+        #For valid esr versions run curl -s https://download-installer.cdn.mozilla.net/pub/firefox/releases/|grep esr|cut -d/ -f5|tr -d "latesr-"
+        /bin/rm ${dmgfile}
+        /bin/echo "`date`: ERROR: Firefox ESR update unsuccessful, version remains at ${currentinstalledver}." >> ${logfile}
+        /bin/echo "--" >> ${logfile}
+        exit 1
+        fi
+        /bin/echo "`date`: Mounting installer disk image." >> ${logfile}
+        /usr/bin/hdiutil attach ${dmgfile} -nobrowse -quiet
+        /bin/echo "`date`: Installing..." >> ${logfile}
+        ditto -rsrc "/Volumes/Firefox/Firefox.app" "/Applications/Firefox.app"
+
+        /bin/sleep 10
+        /bin/echo "`date`: Unmounting installer disk image." >> ${logfile}
+        /usr/bin/hdiutil detach $(/bin/df | /usr/bin/grep Firefox | awk '{print $1}') -quiet
+        /bin/sleep 10
+        /bin/echo "`date`: Deleting disk image." >> ${logfile}
+        /bin/rm ${dmgfile}
+
+        #double check to see if the new version got updated
+        newlyinstalledver=`/usr/bin/defaults read /Applications/Firefox.app/Contents/Info CFBundleShortVersionString`
+        if [ "${ver}" = "${newlyinstalledver}" ]; then
+            /bin/echo "`date`: SUCCESS: Firefox ESR has been updated to version ${newlyinstalledver}" >> ${logfile}
+       # /Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType hud -title "Firefox Installed" -description "Firefox has been updated." &
+        else
+            /bin/echo "`date`: ERROR: Firefox ESR update unsuccessful, version remains at ${currentinstalledver}." >> ${logfile}
+            /bin/echo "--" >> ${logfile}
+            exit 1
+        fi
+
+    # If Firefox is up to date already, just log it and exit.       
+        else
+        /bin/echo "`date`: Firefox ESR is already up to date, running ${currentinstalledver}." >> ${logfile}
+        /bin/echo "--" >> ${logfile}
+    fi 
+
+exit 0
+
