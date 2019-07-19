@@ -55,7 +55,7 @@ if [ "$currentinstalledver" != "$latestver" ]; then
         exit 1
     fi
         else
-        /bin/echo "`date`: Firefox ESR is already up to date, running ${currentinstalledver}." >> ${logfile}
+        /bin/echo "`date`: Google Chrome is already up to date, running ${currentinstalledver}." >> ${logfile}
         /bin/echo "--" >> ${logfile}
 fi
 /bin/echo "`date`: Unmounting installer disk image." >>${logfile}
