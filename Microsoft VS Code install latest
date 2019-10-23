@@ -1,0 +1,115 @@
+#!/bin/sh
+#####################################################################################################
+#
+# ABOUT THIS PROGRAM
+#
+# NAME
+#	auto-installVSCode.sh -- Installs the latest version of Visual Studio Code
+#
+# SYNOPSIS
+#	sudo auto-installVSCode.sh
+#
+####################################################################################################
+#
+# HISTORY
+#
+#	Version: 1.1
+#
+#	- Griffin Holt, 08.20.2019
+#	- v.1.1 Top-Goodman, 19.07.2019:edited to ignore CPU architecture for non-intel based Macs in 2020
+#	changed logging method to funtion including timestamps at each entry. Added a version compare to 
+#	quit if current latest version already installed. Chagned the way VS Code is closed
+#
+####################################################################################################
+# Script to download and install VS Code directly from the Internet
+myLog() { 
+    /bin/echo "`date`: $1" >> $logfile 
+    }
+
+		# Assignment of global variables
+		protocolDomain='https://code.visualstudio.com'
+		zipfile="VSCode.zip"
+		logfile="/Library/Logs/VSCodeInstallScript.log" 
+
+		# Begin writing to a log file
+		myLog  "--" 
+		myLog "Parsing through $protocolDomain in order to find the download URL for VSCode." 
+
+		# Find the release page for the new update
+		newUpdatePage=$(curl $protocolDomain/updates)
+
+		# Remove the redirection clause in order to obtain the URL for the new update page
+		redirectClause='Found. Redirecting to '
+		newUpdatePage=${newUpdatePage#${redirectClause}}
+
+		# Find the download page for the specific new update and revision (NOTE: The download for the Linux URL is very similar to the Mac URL, and is therefore parsed from this page)
+		linuxPath='/linux-x64/stable'
+		linuxURL=$(curl $protocolDomain/$newUpdatePage | sed -n 's/.*href="\([^"]*\).*/\1/p' | grep "$linuxPath")
+
+		# Remove the path to the Linux download and replace it with the path to the Mac download
+		latestUpdateURL=${linuxURL%${linuxPath}}
+		macPath='/darwin/stable'
+		macDownloadPage="$latestUpdateURL$macPath"
+
+		#Before curling new version check current version against newest found version
+		latestver=$(echo $latestUpdateURL|awk -F "/" '{print$4}')
+		myLog "Latest version is: ${latestver}"
+		if [ -e "/Applications/Visual Studio Code.app" ]; then
+    		currentinstalledver=$(/usr/bin/defaults read /Applications/Visual\ Studio\ Code.app/Contents/Info CFBundleShortVersionString )
+    		myLog "Current installed version is: $currentinstalledver"
+    			if [ ${latestver} = ${currentinstalledver} ]; then
+        		myLog "Microsoft Visual Studio Code is current. Exiting"
+                myLog "--"
+        		exit 0
+				else
+				myLog "Will begin attempt to upgrade Microsoft Visual Studio Code from ${currentinstalledver} to ${latestver}"
+    			fi
+    		else
+    		myLog "Microsoft Visual Studio Code is is not installed."
+			fi
+
+		# Curl the resulting download page. It redirects to the actual download URL for the zip file
+		macDownloadURL=$(curl $macDownloadPage)
+		url=${macDownloadURL#${redirectClause}}
+
+		# Kill any open sessions of VSCode
+		myLog "Killing any open sessions of Visual Studio Code." 
+		pkill Electron
+
+		# Remove the previous version of VSCode
+		myLog "Removing the previous version of Visual Studio Code." 
+		rm -rf /Applications/Visual\ Studio\ Code.app
+
+		# Download the latest version from the parsed url via 'curl'
+		myLog "Downloading latest version." 
+		/usr/bin/curl -s -o /tmp/${zipfile} ${url}
+
+		# Unzip the compressed .app and move it to /Applications
+		myLog "Unzipping the compressed file of the latest version and moving it to /Applications." 
+		unzip /tmp/${zipfile} -d /Applications
+
+		# Remove the leftover zip file from the /tmp cache
+		myLog "Removing the .zip file from /tmp." 
+		rm -f /tmp/${zipfile}
+
+		#Check if install/upgrade went as expected.
+		currentinstalledver=$(/usr/bin/defaults read /Applications/Visual\ Studio\ Code.app/Contents/Info CFBundleShortVersionString )
+		if [ ${latestver} = ${currentinstalledver} ]; then
+		myLog "Current installed version is now: $currentinstalledver"
+
+		# Change the permissions and owndership of the .app file in order to remove it from the 'Downloaded from Internet' quarantine
+		myLog "Setting proper ownership and permission to Microsoft Visual Studio Code"
+		chmod -R 755 /Applications/Visual\ Studio\ Code.app
+		chown -R root:wheel /Applications/Visual\ Studio\ Code.app
+
+		myLog  "--" 
+		exit 0
+
+		#Log an unexpected exit
+		else 
+			if [ -e "/Applications/Visual Studio Code.app" ]; then
+    		myLog "ERROR - Current installed version is: $currentinstalledver, update failed"
+			else 
+			myLog "ERROR - Install failed. Visual Studio Code did NOT install"
+		exit 1
+		fi
