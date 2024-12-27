@@ -103,7 +103,7 @@ echo "${laps_password}" | pbcopy
 audit_response=$(curl --silent --request GET "${jamf_url}/api/v2/local-admin-password/${management_id}/account/${username}/audit" \
 --header "Authorization: Bearer ${access_token}")
 
-laps_expiration=$(echo $audit_response | jq -r '.results[0].expirationTime')
+laps_expiration=$(echo $audit_response | jq -r '.results[-1].expirationTime')
 log "LAPS Password Expiration (UTC): $laps_expiration"
 
 # Display the password and expiration date in a popup dialog box
