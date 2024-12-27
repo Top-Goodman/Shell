@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 
-#  Get-JLAPS_alt.sh
-#  can rename to Get-JLAPS.command if you want it to be click to run, as designed meant to be added to Jamf as a script called by a policy
+#  Get-JLAPS.sh
+#
 #
 #  Created by Goodman, Spencer on 12/27/24.
-#  API Role needs Read Computers, View Local Admin Password Audit History, View Local Admin Password
-#  Admin Account specified in variable declaration, can probably modify to prompt for username or use a dropdown selection box with prepopulated values (example provided below)
-#  Checks Jamf for all computers, and prompts by hostname.
-#  Uses this to get serial number, computer ID then uses that to get Mangement ID of selected computer.
-#  Matches Admin Account to Mangement ID and gets password then expiration information in UTC
-#  Copies password to clipboard (This might not work depending on process owner when script is ran versus logged in user)
-#  Shows a dialog box with the Admin Account and current Laps Password (can copy\paste from here if\as needed)
+#  API Role needs Read Computers, View Local Admin Password
+#  Admin Account specified in variable declaration
+#  Grabs serial number off machine running command
+#  Uses this to get computer ID then uses that to get Mangement ID
+#  Matches Admin Account to Mangement ID and gets password
+#  Copies password to clipboard
+#  Shows a dialog box with the Admin Account and current Laps Password
 #
 # Replace these variables with your actual values
-client_id="<your client ID>"
-client_secret="<your client secret>"
-jamf_url="https://<tenant>.jamfcloud.com"
+client_id="f0acf79a-37dc-44db-b7fe-63833ef5343e"
+client_secret="E0wr9phFIOYbmaPgO5vAK7hViKbCLZky2lN7ZiURcUWtGQBoYL-mhKQcf-w-PU2N"
+jamf_url="https://kelleydrye.jamfcloud.com"
 # Can use this commented out version if you have multiple local admins managed via Jamf Laps, and want to allow selection. If so, comment out other username= below this.
-#username=$(osascript -e 'display dialog "Choose an admin account:" buttons {"<admin account>", "<admin account2>"} default button "<admin account>"' -e 'button returned of result')
+#username=$(osascript -e 'display dialog "Choose an admin account:" buttons {"KDWAdmin", "KDW_Admin"} default button "KDWAdmin"' -e 'button returned of result')
 # Can use this commented out version to prompt to provide text input for username. If so, comment out other username= below this.
 #username=$(osascript -e 'text returned of (display dialog "Enter your username:" default answer "")')
 # Can use this commented out version to prompt for seleciton of all found local accounts to use as username (excluding a few options). If so, comment out other username= below this.
@@ -31,11 +31,10 @@ jamf_url="https://<tenant>.jamfcloud.com"
 #end if
 #EOF
 #)
-username="<admin account>"
+username="KDWAdmin"
 log_file="/private/var/log/RetrieveLAPS.log"
 loggedInUser=$(stat -f "%Su" /dev/console)
 
-# ----- DO NOT EDIT BELOW THIS LINE ------- #
 # Logging function with timestamp
 log() {
     local message="$1"
@@ -76,10 +75,10 @@ else
 end if
 EOF
 )
-
+log "Computer ID: $computer_id"
 # Get the computer ID of the selected computer
 computer_id=$(curl -H "Authorization: Bearer $access_token" -H "Accept: application/json" "$jamf_url/api/v1/computers-inventory" | jq -r --arg name "$selected_computer" '.results[] | select(.general.name == $name) | .id')
-log "Computer ID: $computer_id"
+log "Computername: $selected_computer"
 
 # Get the serial number of the selected computer using the computer ID
 serial_number=$(curl -H "Authorization: Bearer $access_token" -H "Accept: application/json" "$jamf_url/api/v1/computers-inventory-detail/$computer_id" | jq -r '.hardware.serialNumber')
@@ -118,4 +117,4 @@ laps_expiration=$(echo $audit_response | jq -r '.results[-1].expirationTime')
 log "LAPS Password Expiration (UTC): $laps_expiration"
 
 # Display the password and expiration date in a popup dialog box
-osascript -e "display dialog \"Admin Username: ${username}\nCurrent LAPS Password: ${laps_password}\nExpiration Date (UTC): ${laps_expiration}\" buttons {\"OK\"} default button \"OK\""
+osascript -e "display dialog \"Computer Name: ${selected_computer}\nAdmin Username: ${username}\nCurrent LAPS Password: ${laps_password}\nExpiration Date (UTC): ${laps_expiration}\" buttons {\"OK\"} default button \"OK\""
