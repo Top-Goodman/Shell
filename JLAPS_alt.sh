@@ -13,9 +13,9 @@
 #  Shows a dialog box with the Admin Account and current Laps Password
 #
 # Replace these variables with your actual values
-client_id="f0acf79a-37dc-44db-b7fe-63833ef5343e"
-client_secret="E0wr9phFIOYbmaPgO5vAK7hViKbCLZky2lN7ZiURcUWtGQBoYL-mhKQcf-w-PU2N"
-jamf_url="https://kelleydrye.jamfcloud.com"
+client_id="<your client ID>"
+client_secret="<your client secret>"
+jamf_url="https://<tenant>.jamfcloud.com"
 # Can use this commented out version if you have multiple local admins managed via Jamf Laps, and want to allow selection. If so, comment out other username= below this.
 #username=$(osascript -e 'display dialog "Choose an admin account:" buttons {"KDWAdmin", "KDW_Admin"} default button "KDWAdmin"' -e 'button returned of result')
 # Can use this commented out version to prompt to provide text input for username. If so, comment out other username= below this.
@@ -31,7 +31,7 @@ jamf_url="https://kelleydrye.jamfcloud.com"
 #end if
 #EOF
 #)
-username="KDWAdmin"
+username="<admin account>"
 log_file="/private/var/log/RetrieveLAPS.log"
 loggedInUser=$(stat -f "%Su" /dev/console)
 
@@ -107,7 +107,7 @@ laps_password=$(echo $laps_response | jq -r '.password')
 log "LAPS Password: $laps_password"
 
 # Optional: Copy the password to the clipboard (only works if script principal is logged on user
-echo "${laps_password}" | pbcopy
+echo "${laps_password}" | tr -d '\n'| pbcopy
 
 # Get the expiration date using the audit endpoint
 audit_response=$(curl --silent --request GET "${jamf_url}/api/v2/local-admin-password/${management_id}/account/${username}/audit" \
