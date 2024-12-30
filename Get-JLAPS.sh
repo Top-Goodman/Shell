@@ -97,7 +97,7 @@ laps_password=$(echo $laps_response | jq -r '.password')
 log "LAPS Password: $laps_password"
 
 # Optional: Copy the password to the clipboard (only works if script principal is logged on user
-echo "${laps_password}" | pbcopy
+echo "${laps_password}" | tr -d '\n'| pbcopy
 
 # Get the expiration date using the audit endpoint
 audit_response=$(curl --silent --request GET "${jamf_url}/api/v2/local-admin-password/${management_id}/account/${username}/audit" \
