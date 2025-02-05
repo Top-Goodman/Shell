@@ -1,0 +1,134 @@
+#!/bin/bash
+
+# Check if the access token is provided as an argument
+if [ -z "$1" ]; then
+  echo "Usage: $0 <access_token>"
+  exit 1
+fi
+
+ACCESS_TOKEN=$1
+
+log_file="/private/var/log/graphDriveMapper.log"
+
+# List of groups to check for matches
+check_groups=("Group 1" "Group 2" "Admins")
+
+# Logging function with timestamp
+log() {
+    local message="$1"
+    local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
+    echo "[$timestamp] $message" >> "$log_file"
+    echo "[$timestamp] $message"
+}
+
+# Function to URL-encode a string
+url_encode_spaces_commas() {
+  local string="${1}"
+  local encoded="${string// /%20}"  # Replace spaces with %20
+  encoded="${encoded//,/%2C}"       # Replace commas with %2C
+  log "${encoded}"
+}
+
+# Log the script start
+log "Script started"
+
+# Get Logged in user
+logged_in_user=$(stat -f "%Su" /dev/console)
+log "Logged in User: $logged_in_user"
+
+# Get id associated to logged in user
+uid=$(id -u "$logged_in_user")
+log "UserID: $uid"
+
+# run command as logged in user to get Kerberos Ticket list on device and manipulate output and text to spit out desired SamAccountName
+san=$(launchctl asuser $uid sudo -u "$logged_in_user" klist|grep 'Principal:'|awk '{print $2}'| sed 's/^[[:space:]]*//;s/[[:space:]]*$//'|cut -d'@' -f1)
+log "SamAccountName: $san"
+
+# Get Display Name
+display_name=$(su -l `stat -f "%Su" /dev/console` -c "id -F")
+log "Display Name: $display_name"
+
+# Define the filter query
+filter_query="\$filter=displayName eq '$display_name'"
+log "Filter Query (original): $filter_query"
+
+# URL-encode spaces and commas in the filter query
+encoded_filter_query=$(url_encode_spaces_commas "$filter_query")
+log "Filter Query (encoded): $encoded_filter_query"
+
+# Define the API endpoint
+api_endpoint="https://graph.microsoft.com/v1.0/users"
+
+# Make the API request using curl
+user=$(curl -X GET "$api_endpoint?$encoded_filter_query" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json")
+
+# Print the response
+log "User: $user"
+
+# Extract the user ID from the response
+user_id=$(echo "$user" | jq -r '.value[0].id')
+
+# Print the user ID
+log "User ID: $user_id"
+
+# Define the API endpoint to get user's groups
+groups_endpoint="https://graph.microsoft.com/v1.0/users/$user_id/transitiveMemberOf"
+
+# Make the API request to get user's groups
+groups_response=$(curl -X GET "$groups_endpoint" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json")
+
+# Extract and print the group names from the response
+group_names=$(echo "$groups_response" | jq -r '.value[].displayName')
+
+# Convert group names to an array
+IFS=$'\n' read -r -d '' -a group_names_array <<< "$group_names"
+
+# Check for matches (Can probably remove this section)
+echo "Matching Groups:"
+for group_name in "${group_names_array[@]}"; do
+  for check_group in "${check_groups[@]}"; do
+    if [[ "$group_name" == "$check_group" ]]; then
+      log "Matching Group found: $group_name"
+    fi
+  done
+done
+
+
+# Check for matches and use a case statement to perform actions
+for group_name in "${group_names_array[@]}"; do
+  for check_group in "${check_groups[@]}"; do
+    if [[ "$group_name" == "$check_group" ]]; then
+      case "$group_name" in
+        "Group 1")
+          log "$display_name is a member of Group 1"
+          log "Mapping Share1"
+          su -l `stat -f "%Su" /dev/console` -c "open -g smb://server.domain.com/Share1"
+          log "Mapping $san$"
+          su -l `stat -f "%Su" /dev/console` -c "open g smb://server.domain.com/Home"          ;;
+        "Group 2")
+          log "$display_name is a member of Group 2"
+          log "Mapping Share2"
+          su -l `stat -f "%Su" /dev/console` -c "open -g smb://server.domain.com/Share2"
+          log "Mapping $san$"
+          su -l `stat -f "%Su" /dev/console` -c "open -g smb://server.domain.com/Home"
+          ;;
+        "Admins")
+          log "$display_name is a member of Admins"
+          log "Mapping Shares"
+          su -l `stat -f "%Su" /dev/console` -c "open -g smb://server.domain.com/Shares"
+          log "Mapping $san$"
+          su -l `stat -f "%Su" /dev/console` -c "open -g smb://server.domain.com/Home"
+          log "Mapping Admin"
+          su -l `stat -f "%Su" /dev/console` -c "open -g smb://server.domain.com/Admin"
+          ;;
+        *)
+          log "$display_name is a member of an unknown group"
+          ;;
+      esac
+    fi
+  done
+done
