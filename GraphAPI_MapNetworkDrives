@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Please only select one of the Access_Token options below
+
+## 1. Begin Access_Token as Parameter
 # This will make the access token required as argument during script run. Future version will replace this with client & secret from Azure.
 # Check if the access token is provided as an argument
 if [ -z "$1" ]; then
@@ -8,6 +11,47 @@ if [ -z "$1" ]; then
 fi
 
 ACCESS_TOKEN=$1
+## End Access_Token as Parameter
+
+## 2. Begin Access_Token as Client Secret
+# Define your Azure AD app credentials
+client_id="<Client ID>
+client_secret="<Client Secret>"
+tenant_id="<Tenand ID>"
+scope="https://graph.microsoft.com/.default"
+
+# Get the access token
+response=$(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
+-d "grant_type=client_credentials&client_id=$client_id&client_secret=$client_secret&scope=$scope" \
+"https://login.microsoftonline.com/$tenant_id/oauth2/v2.0/token")
+## End Access_Token as Client Secret
+
+## 3. Begin Access_Token as Encoded Client Secret
+#[ Outside of this script, using functions available at https://github.com/kc9wwh/EncryptedStrings/tree/master, encode your client secret. We will refer to that output as enc_client_secret, make sure to remember the passkey and salt provided by those funcitons as well]
+# Decryption Information
+salt="<salt (output from funciton)>"
+passkey="<passkey  (output from funciton)>"
+enc_client_secret="<Encoded Client Secret (output from funciton)>"
+
+# Define your Azure AD app credentials
+client_id="<Client ID>
+client_secret=$(echo "${enc_client_secret}|/usr/bin/openssl enc -aes256 -d -a -A -S "${salt}" -k "${passkey}")" 
+tenant_id="<Tenand ID>"
+scope="https://graph.microsoft.com/.default"
+
+# Get the access token
+response=$(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
+-d "grant_type=client_credentials&client_id=$client_id&client_secret=$client_secret&scope=$scope" \
+"https://login.microsoftonline.com/$tenant_id/oauth2/v2.0/token")
+## End Access_Token as Encoded Client Secret
+
+## 4. Begin Access_Token as Apple Script prompt)
+ACCESS_TOKEN=$(osascript <<EOF
+set userInput to text returned of (display dialog "Enter Access Token:" default answer "")
+return userInput
+EOF
+)
+## End Access_Token as Apple Script prompt)
 
 log_file="/private/var/log/graphDriveMapper.log"
 
