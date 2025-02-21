@@ -24,6 +24,8 @@ scope="https://graph.microsoft.com/.default"
 response=$(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
 -d "grant_type=client_credentials&client_id=$client_id&client_secret=$client_secret&scope=$scope" \
 "https://login.microsoftonline.com/$tenant_id/oauth2/v2.0/token")
+
+ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
 ## End Access_Token as Client Secret
 
 ## 3. Begin Access_Token as Encoded Client Secret
@@ -43,6 +45,8 @@ scope="https://graph.microsoft.com/.default"
 response=$(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
 -d "grant_type=client_credentials&client_id=$client_id&client_secret=$client_secret&scope=$scope" \
 "https://login.microsoftonline.com/$tenant_id/oauth2/v2.0/token")
+
+ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
 ## End Access_Token as Encoded Client Secret
 
 ## 4. Begin Access_Token as Apple Script prompt)
