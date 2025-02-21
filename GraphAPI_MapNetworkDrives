@@ -37,10 +37,15 @@ map_drive() {
     local server=$1
     local share=$2
     local user=$(stat -f "%Su" /dev/console)
-    
-    log "Mapping $server - $share"
-    su -l "$user" -c "open -g smb://$server.contoso.com/$share"
-    sleep 4	
+    mount_point="/Volumes/$share"
+
+    if mount | grep "on $mount_point" > /dev/null; then
+        log "Drive already mounted at $mount_point"
+    else
+        log "Mapping $server - $share"
+        su -l "$user" -c "open -g smb://$server.kelleydrye.com/$share"
+        sleep 4
+    fi	
 }
 
 # Log the script start
