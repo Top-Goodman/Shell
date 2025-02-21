@@ -15,7 +15,7 @@ ACCESS_TOKEN=$1
 
 ## 2. Begin Access_Token as Client Secret
 # Define your Azure AD app credentials
-client_id="<Client ID>
+client_id="<Client ID>"
 client_secret="<Client Secret>"
 tenant_id="<Tenand ID>"
 scope="https://graph.microsoft.com/.default"
