@@ -34,7 +34,7 @@ passkey="<passkey  (output from funciton)>"
 enc_client_secret="<Encoded Client Secret (output from funciton)>"
 
 # Define your Azure AD app credentials
-client_id="<Client ID>
+client_id="<Client ID>"
 client_secret=$(echo "${enc_client_secret}|/usr/bin/openssl enc -aes256 -d -a -A -S "${salt}" -k "${passkey}")" 
 tenant_id="<Tenand ID>"
 scope="https://graph.microsoft.com/.default"
