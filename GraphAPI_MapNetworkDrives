@@ -87,7 +87,11 @@ map_drive() {
     local user=$(stat -f "%Su" /dev/console)
     mount_point="/Volumes/$share"
 
-    if mount | grep "on $mount_point" > /dev/null; then
+    # Escape special characters in the share name for grep
+    local escaped_share=$(echo "$share" | sed 's/[$]/\\$/g')
+
+    # Check if the mount point is already mounted
+    if mount | grep "on /Volumes/$escaped_share" > /dev/null; then
         log "Drive already mounted at $mount_point"
     else
         log "Mapping $server - $share"
