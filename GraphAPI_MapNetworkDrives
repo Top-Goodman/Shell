@@ -162,8 +162,8 @@ user=$(curl -X GET "$api_endpoint?$encoded_filter_query" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json")
 
-# Print the response
-log "User: $user"
+# Uncomment print the response for troubleshooting
+#log "User: $user"
 
 # Extract the user ID from the response
 user_id=$(echo "$user" | jq -r '.value[0].id')
