@@ -1,0 +1,146 @@
+#!/bin/bash
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+# Copyright (c) 2020 Jamf?  All rights reserved?
+#
+#       Redistribution and use in source and binary forms, with or without
+#       modification, are permitted provided that the following conditions are met:
+#               * Redistributions of source code must retain the above copyright
+#                 notice, this list of conditions and the following disclaimer.
+#               * Redistributions in binary form must reproduce the above copyright
+#                 notice, this list of conditions and the following disclaimer in the
+#                 documentation and/or other materials provided with the distribution.
+#               * Neither the name of the Jamf nor the names of its contributors may be
+#                 used to endorse or promote products derived from this software without
+#                 specific prior written permission.
+#
+#       THIS SOFTWARE IS PROVIDED BY JAMF SOFTWARE, LLC "AS IS" AND ANY
+#       EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#       WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#       DISCLAIMED. IN NO EVENT SHALL JAMF SOFTWARE, LLC BE LIABLE FOR ANY
+#       DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+#       (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+#       LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+#       ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+#       (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+#       SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+# This script was designed to be used in a Self Service policy to allow the facilitation
+# or log collection by the end-user and upload the logs to the device record in Jamf Pro
+# as an attachment.
+#
+# REQUIREMENTS:
+#           - Jamf Pro
+#           - macOS Clients running version 10.13 or later
+#
+# API Roles: (I might have given it too much for mine, yet this is what ended up working for me
+#
+#            API: Read API Integrations
+#            Attachments: Read File Attachments, Delete File Attachments, Create File Attachments, Update File Attachments
+#            Computers: Update Computers, Read Computers, Create Computers
+#            Extension: Read Allowed File Extension, 
+#
+# For more information, visit https://github.com/kc9wwh/logCollection (I have modified this script a large amount since that, not sure how recognizable the rest is)
+#
+# Written by: Joshua Roskos | Jamf
+# Revised by: Alton Brailovskiy | Martin Cox (Jamf) 
+# Revised by: Top-Goodman (Annoying person)
+#
+# Revision History
+# 2025-03-18: Added functions and loops to check through directories and build array lists of log, txt, and plist to upload. It seems .zip isn't supported anymore. That would have been nicer...
+# 2024-08-2024: Updated Token Invalidation + Retry Logic
+# 2024-07-23: Updated Script
+# 2023-11-30: Added support for bearer auth and invalidating bearer token once done.
+# 2020-12-01: Added support for macOS Big Sur
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+## User Variables
+## Ensure not to include the / at the end of the JamfProURL parameter. ex https://instance.jamfcloud.com is the parameter NOT https://instance.jamfcloud.com/
+## Suggested Logs to pull: /private/var/log/install.log* /private/var/log/jamf.log* /private/var/log/system.log*
+## Do not set this to run at check in. Should use this by targetting the computer, or setting this run once and flush them from log when needing to rerun. Delete logs from Jamf inventory\database when done downloading or viewing.
+## Replace <values> in variables below.
+
+jamfProURL="https://<instance>.jamfcloud.com"
+jamfProUser="<client_id>"
+jamfProPassEnc="<encoded_client_secret>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+# Comma Seperated list of paths to check. Wild card will be searched through (not recursivly) via function below (don't even know if that fully works as intended), the stat -f "%Su" is to check the logged in user for files 
+logFiles="/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/`stat -f "%Su" /dev/console`/Library/Preferences/com.jamf*" 
+salt="<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+key="<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+
+## System Variables
+serial_number=$(system_profiler SPHardwareDataType | grep 'Serial Number' | awk '{print $NF}')
+currentUser=$( stat -f%Su /dev/console )
+compHostName=$( scutil --get LocalHostName )
+timeStamp=$( date '+%Y-%m-%d-%H-%M-%S' )
+osMajor=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $1}')
+osMinor=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $2}')
+jamfProPass=$(echo "${jamfProPassEnc}" |/usr/bin/openssl enc -aes256 -d -a -A -S "${salt}" -k "${key}")
+
+get_access_token() {
+  curl --request POST \
+    --url "$jamfProURL/api/oauth/token" \
+    --header 'Content-Type: application/x-www-form-urlencoded' \
+    --data-urlencode "client_id=$jamfProUser" \
+    --data-urlencode 'grant_type=client_credentials' \
+    --data-urlencode "client_secret=$jamfProPass" | jq -r '.access_token'
+}
+
+accessToken=$(get_access_token)
+
+
+# Get the computer ID using the serial number
+computer_id_response=$(curl --silent --request GET "${jamfProURL}/JSSResource/computers/serialnumber/${serial_number}" \
+--header "Authorization: Bearer ${accessToken}" \
+--header "Accept: application/json")
+
+# Print the response for debugging
+#echo "Computer ID Response: $computer_id_response"
+
+computerID=$(echo $computer_id_response | jq -r '.computer.general.id')
+echo "Computer ID: $computerID"
+
+# Initialize the logArray variable
+logArray=()
+
+# Function to process logFiles and add paths to logArray
+process_log_files() {
+    local logArrayName=$1
+    local paths=$2
+
+    # Convert comma-separated list into an array
+    IFS=',' read -r -a logFiles <<< "$paths"
+
+    for logFile in "${logFiles[@]}"; do
+        if [[ $logFile == *\** ]]; then
+            # If the logFile contains a wildcard, use globbing to find matching files
+            for file in $(find ${logFile%/*} -name "${logFile##*/}"); do
+                eval "$logArrayName+=('$file')"
+            done
+        else
+            # If no wildcard, add the full path to logArray
+            eval "$logArrayName+=('$logFile')"
+        fi
+    done
+}
+
+# Example usage
+paths="/path/to/log1,/path/to/log2*"
+process_log_files logArray "$logFiles"
+
+# Print the contents of logArray
+#echo "${logArray[@]}"
+
+
+# Upload file(s) to computer attachments
+for file in "${logArray[@]}"; do
+     if [[ $file == *.log ]]; then
+         echo "Uploading $file to $jamfProURL - Computer $computerID"
+curl -X POST "$jamfProURL:443/JSSResource/fileuploads/computers/id/$computerID" -H "Authorization: Bearer ${accessToken}" -F name=@"$file"
+fi
+done
