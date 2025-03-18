@@ -65,13 +65,13 @@
 ## Do not set this to run at check in. Should use this by targetting the computer, or setting this run once and flush them from log when needing to rerun. Delete logs from Jamf inventory\database when done downloading or viewing.
 ## Replace <values> in variables below.
 
-jamfProURL="https://<instance>.jamfcloud.com"
-jamfProUser="<client_id>"
+jamfProURL=$4 #"https://<instance>.jamfcloud.com"
+jamfProUser=$5 #"<client_id>"
 jamfProPassEnc="<encoded_client_secret>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 # Comma Seperated list of paths to check. Wild card will be searched through (not recursivly) via function below (don't even know if that fully works as intended), the stat -f "%Su" is to check the logged in user for files 
-logFiles="/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/`stat -f "%Su" /dev/console`/Library/Preferences/com.jamf*" 
-salt="<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
-key="<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+logFiles=$6 #"/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/`stat -f "%Su" /dev/console`/Library/Preferences/com.jamf*" 
+salt=$7 #"<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+key=$8 #"<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 
 ## System Variables
 serial_number=$(system_profiler SPHardwareDataType | grep 'Serial Number' | awk '{print $NF}')
