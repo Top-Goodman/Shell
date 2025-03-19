@@ -81,6 +81,8 @@ timeStamp=$( date '+%Y-%m-%d-%H-%M-%S' )
 osMajor=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $1}')
 osMinor=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $2}')
 jamfProPass=$(echo "${jamfProPassEnc}" |/usr/bin/openssl enc -aes256 -d -a -A -S "${salt}" -k "${key}")
+jamfProURL="${jamfProURL%/}"
+if [[ $jamfProURL != *://* ]]; then jamfProURL="https://$jamfProURL"; fi
 
 get_access_token() {
   curl --request POST \
