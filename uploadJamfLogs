@@ -52,13 +52,14 @@
 # Revised by: Top-Goodman (Annoying person)
 #
 # Revision History
+# 2025-03-19: Added function to include timestamp in filename for upload. Added logging function and a few more variables. Rearranged script to put all functions at the top. 
 # 2025-03-18: Added functions and loops to check through directories and build array lists of log, txt, and plist to upload. It seems .zip isn't supported anymore. That would have been nicer...
 # 2024-08-2024: Updated Token Invalidation + Retry Logic
 # 2024-07-23: Updated Script
 # 2023-11-30: Added support for bearer auth and invalidating bearer token once done.
 # 2020-12-01: Added support for macOS Big Sur
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-version="v1.0"
+version="v1.1"
 
 ## User Variables
 ## Ensure not to include the / at the end of the JamfProURL parameter. ex https://instance.jamfcloud.com is the parameter NOT https://instance.jamfcloud.com/
@@ -94,11 +95,6 @@ log() {
     echo "[$timestamp] $message"
 }
 
-# Log the script start
-log "Script started. Version:$version"
-log "Serial Number: $serial_number"
-log "Operating System: $osMajor.$osMinor" 
-
 # Function to retrieve access token for Jamf API
 get_access_token() {
   curl --request POST \
@@ -108,24 +104,6 @@ get_access_token() {
     --data-urlencode 'grant_type=client_credentials' \
     --data-urlencode "client_secret=$jamfProPass" | jq -r '.access_token'
 }
-
-log "Retrieving Access Token from $jamfProURL as $jamfProUser"
-accessToken=$(get_access_token)
-
-
-# Get the computer ID using the serial number
-computer_id_response=$(curl --silent --request GET "${jamfProURL}/JSSResource/computers/serialnumber/${serial_number}" \
---header "Authorization: Bearer ${accessToken}" \
---header "Accept: application/json")
-
-# Print the response for debugging
-#log "Computer ID Response: $computer_id_response"
-
-computerID=$(echo $computer_id_response | jq -r '.computer.general.id')
-log "Computer ID: $computerID"
-
-# Initialize the logArray variable
-logArray=()
 
 # Function to process logFiles and add paths to logArray
 process_log_files() {
@@ -151,6 +129,52 @@ process_log_files() {
     done
 }
 
+# Function to rename the file by adding a timestamp before the last dot
+upload_file_with_timestamp() {
+    local filePath="$1"
+    local timestamp=$(date +"%Y-%m-%dT%H.%M.%S%z")
+
+    # Extract the directory, filename without extension, and extension
+    local dir="${filePath%/*}"
+    local base="${filePath##*/}"
+    local name="${base%.*}"
+    local ext="${base##*.}"
+    
+    # Construct the new filename
+    local newFilePath="${dir}/${name}_${timestamp}.${ext}"
+    
+    # Rename the file
+    cp "$filePath" "$newFilePath"
+    
+    log "Renaming $filePath to $newFilePath"
+log "Uploading $newFilePath to $jamfProURL - Computer $computerID"
+curl -X POST "$jamfProURL:443/JSSResource/fileuploads/computers/id/$computerID" -H "Authorization: Bearer ${accessToken}" -F name=@"$newFilePath"
+sleep 1
+rm "$newFilePath"
+}
+
+# Log the script start
+log "Script started. Version:$version"
+log "Serial Number: $serial_number"
+log "Operating System: $osMajor.$osMinor" 
+
+log "Retrieving Access Token from $jamfProURL as $jamfProUser"
+accessToken=$(get_access_token)
+
+# Get the computer ID using the serial number
+computer_id_response=$(curl --silent --request GET "${jamfProURL}/JSSResource/computers/serialnumber/${serial_number}" \
+--header "Authorization: Bearer ${accessToken}" \
+--header "Accept: application/json")
+
+# Print the response for debugging
+#log "Computer ID Response: $computer_id_response"
+
+computerID=$(echo $computer_id_response | jq -r '.computer.general.id')
+log "Computer ID: $computerID"
+
+# Initialize the logArray variable
+logArray=()
+
 log "Processing provided paths"
 process_log_files logArray "$logFiles"
 log "Processing complete!"
@@ -158,11 +182,9 @@ log "Processing complete!"
 # Print the contents of logArray
 #log "Files processed ${logArray[@]}"
 
-
 # Upload file(s) to computer attachments
 for file in "${logArray[@]}"; do
      if [[ $file == *.log || $file == *.txt || $file == *.plist ]]; then
-         log "Uploading $file to $jamfProURL - Computer $computerID"
-curl -X POST "$jamfProURL:443/JSSResource/fileuploads/computers/id/$computerID" -H "Authorization: Bearer ${accessToken}" -F name=@"$file"
-fi
+          upload_file_with_timestamp $file
+     fi
 done
