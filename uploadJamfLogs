@@ -75,7 +75,7 @@ jamfProPassEnc="${6}" #"<encoded_client_secret>" # see for more inforamtion http
 logFiles="${7}" #"/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/`stat -f "%Su" /dev/console`/Library/Preferences/com.jamf*" 
 salt="${8}" #"<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 key="${9}" #"<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
-purge="{10}" #Leave null to leave all attachments in inventory. Anything here will erase ALL prior existing attachments for comptuer running this script.
+purge="${10}" #Leave null to leave all attachments in inventory. Anything here will erase ALL prior existing attachments for comptuer running this script.
 log_file="/private/var/log/uploadLogsAPI.log"
 
 ## System Variables
