@@ -52,6 +52,7 @@
 # Revised by: Top-Goodman (Annoying person)
 #
 # Revision History
+# 2025-03-19: Added function to check for existing attachments, log them, and delete them. This only runs if the purge variable is set (not empty). I could probably expand this logic to only run for specific file types. Yet not doing that today...
 # 2025-03-19: Added function to include timestamp in filename for upload. Added logging function and a few more variables. Rearranged script to put all functions at the top. 
 # 2025-03-18: Added functions and loops to check through directories and build array lists of log, txt, and plist to upload. It seems .zip isn't supported anymore. That would have been nicer...
 # 2024-08-2024: Updated Token Invalidation + Retry Logic
@@ -59,7 +60,7 @@
 # 2023-11-30: Added support for bearer auth and invalidating bearer token once done.
 # 2020-12-01: Added support for macOS Big Sur
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-version="v1.1"
+version="v1.2"
 
 ## User Variables
 ## Ensure not to include the / at the end of the JamfProURL parameter. ex https://instance.jamfcloud.com is the parameter NOT https://instance.jamfcloud.com/
@@ -74,6 +75,7 @@ jamfProPassEnc="${6}" #"<encoded_client_secret>" # see for more inforamtion http
 logFiles="${7}" #"/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/`stat -f "%Su" /dev/console`/Library/Preferences/com.jamf*" 
 salt="${8}" #"<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 key="${9}" #"<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+purge="{10}" #Leave null to leave all attachments in inventory. Anything here will erase ALL prior existing attachments for comptuer running this script.
 log_file="/private/var/log/uploadLogsAPI.log"
 
 ## System Variables
@@ -103,6 +105,27 @@ get_access_token() {
     --data-urlencode "client_id=$jamfProUser" \
     --data-urlencode 'grant_type=client_credentials' \
     --data-urlencode "client_secret=$jamfProPass" | jq -r '.access_token'
+}
+
+# Function to delete ALL existing attachments for target computer
+delete_ALL_attachments() {
+    local jamfProURL="$1"
+    local computerID="$2"
+    local accessToken="$3"
+
+    # Get the list of filenames for all attachments for a specific computer ID
+    local attachmentFilenames=$(curl -X GET "$jamfProURL:443/JSSResource/computers/id/$computerID" -H "Authorization: Bearer ${accessToken}" | xmllint -format - | xpath -e '/computer/purchasing/attachments' | grep "<filename>")
+    local filename_array=($(echo "$attachmentFilenames" | sed -e 's/<filename>//' -e 's/<\/filename>//'))
+
+    # Get the list of IDs for all attachments for a specific computer ID
+    local attachmentIDs=$(curl -X GET "$jamfProURL:443/JSSResource/computers/id/$computerID" -H "Authorization: Bearer ${accessToken}" | xmllint -format - | xpath -e '/computer/purchasing/attachments' | grep "<id>")
+    local id_array=($(echo "$attachmentIDs" | grep -oE '[0-9]+'))
+
+    for i in "${!id_array[@]}"; do
+        echo "Deleting File: ${filename_array[$i]} - ID: ${id_array[$i]}"
+        curl -X DELETE "$jamfProURL:443/api/v1/computers-inventory/$computerID/attachments/${id_array[$i]}" \
+            -H "Authorization: Bearer ${accessToken}"
+    done
 }
 
 # Function to process logFiles and add paths to logArray
@@ -172,6 +195,10 @@ computer_id_response=$(curl --silent --request GET "${jamfProURL}/JSSResource/co
 computerID=$(echo $computer_id_response | jq -r '.computer.general.id')
 log "Computer ID: $computerID"
 
+if [[ -n "$purge" ]];then
+     delete_ALL_attachments "$jamfProURL" "$computerID" "$accessToken"
+fi
+
 # Initialize the logArray variable
 logArray=()
 
@@ -188,3 +215,6 @@ for file in "${logArray[@]}"; do
           upload_file_with_timestamp $file
      fi
 done
+
+# Log the script end
+log "Script finished. Version:$version"
