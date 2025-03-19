@@ -139,7 +139,7 @@ process_log_files logArray "$logFiles"
 
 # Upload file(s) to computer attachments
 for file in "${logArray[@]}"; do
-     if [[ $file == *.log ]]; then
+     if [[ $file == *.log || $file == *.txt || $file == *.plist ]]; then
          echo "Uploading $file to $jamfProURL - Computer $computerID"
 curl -X POST "$jamfProURL:443/JSSResource/fileuploads/computers/id/$computerID" -H "Authorization: Bearer ${accessToken}" -F name=@"$file"
 fi
