@@ -58,6 +58,7 @@
 # 2023-11-30: Added support for bearer auth and invalidating bearer token once done.
 # 2020-12-01: Added support for macOS Big Sur
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+version="v1.0"
 
 ## User Variables
 ## Ensure not to include the / at the end of the JamfProURL parameter. ex https://instance.jamfcloud.com is the parameter NOT https://instance.jamfcloud.com/
@@ -65,13 +66,14 @@
 ## Do not set this to run at check in. Should use this by targetting the computer, or setting this run once and flush them from log when needing to rerun. Delete logs from Jamf inventory\database when done downloading or viewing.
 ## Replace <values> in variables below.
 
-jamfProURL=$4 #"https://<instance>.jamfcloud.com"
-jamfProUser=$5 #"<client_id>"
-jamfProPassEnc="<encoded_client_secret>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+jamfProURL="${4}" #"https://<instance>.jamfcloud.com"
+jamfProUser="${5}" #"<client_id>"
+jamfProPassEnc="${6}" #"<encoded_client_secret>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 # Comma Seperated list of paths to check. Wild card will be searched through (not recursivly) via function below (don't even know if that fully works as intended), the stat -f "%Su" is to check the logged in user for files 
-logFiles=$6 #"/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/`stat -f "%Su" /dev/console`/Library/Preferences/com.jamf*" 
-salt=$7 #"<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
-key=$8 #"<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+logFiles="${7}" #"/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/`stat -f "%Su" /dev/console`/Library/Preferences/com.jamf*" 
+salt="${8}" #"<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+key="${9}" #"<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
+log_file="/private/var/log/uploadLogsAPI.log"
 
 ## System Variables
 serial_number=$(system_profiler SPHardwareDataType | grep 'Serial Number' | awk '{print $NF}')
@@ -84,6 +86,20 @@ jamfProPass=$(echo "${jamfProPassEnc}" |/usr/bin/openssl enc -aes256 -d -a -A -S
 jamfProURL="${jamfProURL%/}"
 if [[ $jamfProURL != *://* ]]; then jamfProURL="https://$jamfProURL"; fi
 
+# Logging function with timestamp
+log() {
+    local message="$1"
+    local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
+    echo "[$timestamp] $message" >> "$log_file"
+    echo "[$timestamp] $message"
+}
+
+# Log the script start
+log "Script started. Version:$version"
+log "Serial Number: $serial_number"
+log "Operating System: $osMajor.$osMinor" 
+
+# Function to retrieve access token for Jamf API
 get_access_token() {
   curl --request POST \
     --url "$jamfProURL/api/oauth/token" \
@@ -93,6 +109,7 @@ get_access_token() {
     --data-urlencode "client_secret=$jamfProPass" | jq -r '.access_token'
 }
 
+log "Retrieving Access Token from $jamfProURL as $jamfProUser"
 accessToken=$(get_access_token)
 
 
@@ -102,10 +119,10 @@ computer_id_response=$(curl --silent --request GET "${jamfProURL}/JSSResource/co
 --header "Accept: application/json")
 
 # Print the response for debugging
-#echo "Computer ID Response: $computer_id_response"
+#log "Computer ID Response: $computer_id_response"
 
 computerID=$(echo $computer_id_response | jq -r '.computer.general.id')
-echo "Computer ID: $computerID"
+log "Computer ID: $computerID"
 
 # Initialize the logArray variable
 logArray=()
@@ -113,36 +130,39 @@ logArray=()
 # Function to process logFiles and add paths to logArray
 process_log_files() {
     local logArrayName=$1
-    local paths=$2
+    local logFiles=$2
 
     # Convert comma-separated list into an array
-    IFS=',' read -r -a logFiles <<< "$paths"
+    IFS=',' read -r -a paths <<< "$logFiles"
 
-    for logFile in "${logFiles[@]}"; do
+    for logFile in "${paths[@]}"; do
         if [[ $logFile == *\** ]]; then
             # If the logFile contains a wildcard, use globbing to find matching files
+            log "Evaluating $logFile"
             for file in $(find ${logFile%/*} -name "${logFile##*/}"); do
+                log "adding $logFile to log array"
                 eval "$logArrayName+=('$file')"
             done
         else
             # If no wildcard, add the full path to logArray
+            log "adding $logFile to log array"
             eval "$logArrayName+=('$logFile')"
         fi
     done
 }
 
-# Example usage
-paths="/path/to/log1,/path/to/log2*"
+log "Processing provided paths"
 process_log_files logArray "$logFiles"
+log "Processing complete!"
 
 # Print the contents of logArray
-#echo "${logArray[@]}"
+#log "Files processed ${logArray[@]}"
 
 
 # Upload file(s) to computer attachments
 for file in "${logArray[@]}"; do
      if [[ $file == *.log || $file == *.txt || $file == *.plist ]]; then
-         echo "Uploading $file to $jamfProURL - Computer $computerID"
+         log "Uploading $file to $jamfProURL - Computer $computerID"
 curl -X POST "$jamfProURL:443/JSSResource/fileuploads/computers/id/$computerID" -H "Authorization: Bearer ${accessToken}" -F name=@"$file"
 fi
 done
