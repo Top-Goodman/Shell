@@ -52,6 +52,7 @@
 # Revised by: Top-Goodman (Annoying person)
 #
 # Revision History
+# 2025-03-20: Expanded log processing funciton to handle /Users differently. DO NOT TYPE USERNAME if you want /Users/user/Library type /Users/Library. Function will check all users on computer and test each path using each found user.
 # 2025-03-19: Added function to check for existing attachments, log them, and delete them. This only runs if the purge variable is set (not empty). I could probably expand this logic to only run for specific file types. Yet not doing that today...
 # 2025-03-19: Added function to include timestamp in filename for upload. Added logging function and a few more variables. Rearranged script to put all functions at the top. 
 # 2025-03-18: Added functions and loops to check through directories and build array lists of log, txt, and plist to upload. It seems .zip isn't supported anymore. That would have been nicer...
@@ -72,7 +73,7 @@ jamfProURL="${4}" #"https://<instance>.jamfcloud.com"
 jamfProUser="${5}" #"<client_id>"
 jamfProPassEnc="${6}" #"<encoded_client_secret>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 # Comma Seperated list of paths to check. Wild card will be searched through (not recursivly) via function below (don't even know if that fully works as intended), the stat -f "%Su" is to check the logged in user for files 
-logFiles="${7}" #"/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/`stat -f "%Su" /dev/console`/Library/Preferences/com.jamf*" 
+logFiles="${7}" #"/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/Library/Preferences/com.jamf*" 
 salt="${8}" #"<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 key="${9}" #"<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 purge="${10}" #Leave null to leave all attachments in inventory. Anything here will erase ALL prior existing attachments for comptuer running this script.
@@ -137,15 +138,35 @@ process_log_files() {
     IFS=',' read -r -a paths <<< "$logFiles"
 
     for logFile in "${paths[@]}"; do
-        if [[ $logFile == *\** ]]; then
+        if [[ $logFile == /Users/* ]]; then
+            # If the logFile is in the /Users directory, check all user folders
+            basePath="/Users"
+            userFolders=($(ls -d $basePath/*/))
+            for userFolder in "${userFolders[@]}"; do
+                fullPath="${userFolder}${logFile#*/Users/*}"
+                if [[ $fullPath == *\** ]]; then
+                    # If the fullPath contains a wildcard, use globbing to find matching files
+                    log "Evaluating \"$fullPath\""
+                    for evalFile in $(find "${fullPath%/*}" -name "${fullPath##*/}"); do
+                        log "adding $evalFile to log array"
+                        eval "$logArrayName+=('$evalFile')"
+                    done
+                elif [[ -e $fullPath ]]; then
+                    log "adding $fullPath to log array"
+                    eval "$logArrayName+=('$fullPath')"
+                else
+                    log "File $fullPath does not exist"
+                fi
+            done
+        elif [[ $logFile == *\** ]]; then
             # If the logFile contains a wildcard, use globbing to find matching files
-            log "Evaluating $logFile"
-            for file in $(find ${logFile%/*} -name "${logFile##*/}"); do
-                log "adding $logFile to log array"
-                eval "$logArrayName+=('$file')"
+            log "Evaluating \"$logFile\""
+            for evalFile in $(find "${logFile%/*}" -name "${logFile##*/}"); do
+                log "adding $evalFile to log array"
+                eval "$logArrayName+=('$evalFile')"
             done
         else
-            # If no wildcard, add the full path to logArray
+            # If no wildcard and not in /Users, add the full path to logArray
             log "adding $logFile to log array"
             eval "$logArrayName+=('$logFile')"
         fi
