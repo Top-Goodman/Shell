@@ -61,7 +61,7 @@
 # 2023-11-30: Added support for bearer auth and invalidating bearer token once done.
 # 2020-12-01: Added support for macOS Big Sur
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-version="v1.2"
+version="v1.3"
 
 ## User Variables
 ## Ensure not to include the / at the end of the JamfProURL parameter. ex https://instance.jamfcloud.com is the parameter NOT https://instance.jamfcloud.com/
@@ -72,7 +72,7 @@ version="v1.2"
 jamfProURL="${4}" #"https://<instance>.jamfcloud.com"
 jamfProUser="${5}" #"<client_id>"
 jamfProPassEnc="${6}" #"<encoded_client_secret>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
-# Comma Seperated list of paths to check. Wild card will be searched through (not recursivly) via function below (don't even know if that fully works as intended), the stat -f "%Su" is to check the logged in user for files 
+# Comma Seperated list of paths to check. Wild card will be searched through (not recursivly) via function below (don't even know if that fully works as intended), /Users do not put a username here function will take care of this with loop
 logFiles="${7}" #"/private/var/log/install.log*,/private/var/log/jamf.log*,/private/var/log/system.log*,/Library/Managed Preferences/com.jamf.*,/Users/Library/Preferences/com.jamf*" 
 salt="${8}" #"<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 key="${9}" #"<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
