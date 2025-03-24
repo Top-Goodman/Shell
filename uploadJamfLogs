@@ -52,6 +52,7 @@
 # Revised by: Top-Goodman (Annoying person)
 #
 # Revision History
+# 2025-03-24: Removed timestamp variable, it wasn't being used. Functions have local timestamps. Added hostname to begining of uploaded file name for diffentiating downloaded logs, and compacted timestamp of uploaded file name to shorten a bit.
 # 2025-03-20: Expanded log processing funciton to handle /Users differently. DO NOT TYPE USERNAME if you want /Users/user/Library type /Users/Library. Function will check all users on computer and test each path using each found user.
 # 2025-03-19: Added function to check for existing attachments, log them, and delete them. This only runs if the purge variable is set (not empty). I could probably expand this logic to only run for specific file types. Yet not doing that today...
 # 2025-03-19: Added function to include timestamp in filename for upload. Added logging function and a few more variables. Rearranged script to put all functions at the top. 
@@ -61,7 +62,7 @@
 # 2023-11-30: Added support for bearer auth and invalidating bearer token once done.
 # 2020-12-01: Added support for macOS Big Sur
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-version="v1.3"
+version="v1.4"
 
 ## User Variables
 ## Ensure not to include the / at the end of the JamfProURL parameter. ex https://instance.jamfcloud.com is the parameter NOT https://instance.jamfcloud.com/
