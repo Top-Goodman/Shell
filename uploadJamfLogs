@@ -83,7 +83,6 @@ log_file="/private/var/log/uploadLogsAPI.log"
 serial_number=$(system_profiler SPHardwareDataType | grep 'Serial Number' | awk '{print $NF}')
 currentUser=$( stat -f%Su /dev/console )
 compHostName=$( scutil --get LocalHostName )
-timeStamp=$( date '+%Y-%m-%d-%H-%M-%S' )
 osMajor=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $1}')
 osMinor=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $2}')
 jamfProPass=$(echo "${jamfProPassEnc}" |/usr/bin/openssl enc -aes256 -d -a -A -S "${salt}" -k "${key}")
@@ -176,7 +175,7 @@ process_log_files() {
 # Function to rename the file by adding a timestamp before the last dot
 upload_file_with_timestamp() {
     local filePath="$1"
-    local timestamp=$(date +"%Y-%m-%dT%H.%M.%S%z")
+    local timestamp=$(date +"%y%m%d-%H%M%S%z")
 
     # Extract the directory, filename without extension, and extension
     local dir="${filePath%/*}"
