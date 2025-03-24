@@ -185,7 +185,7 @@ upload_file_with_timestamp() {
     local ext="${base##*.}"
     
     # Construct the new filename
-    local newFilePath="${dir}/${name}_${timestamp}.${ext}"
+    local newFilePath="${dir}/${compHostName}_${name}_${timestamp}.${ext}"
     
     # Rename the file
     cp "$filePath" "$newFilePath"
