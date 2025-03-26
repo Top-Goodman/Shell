@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Expectation is that a launchDaemon controls this for scheduling
+
+# Define the log file
+log_file="/private/var/log/localReboot.log"
+
+# Logging function with timestamp
+log() {
+    local message="$1"
+    local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
+    echo "[$timestamp] $message" >> "$log_file"
+}
+
+# Function to display dialogs and reboot
+perform_reboot() {
+    # Log the currently logged-on console user
+    console_user=$(stat -f "%Su" /dev/console)
+    log "Username = $console_user"
+    log "Sent user popup for 15 minute reboot message."
+
+    # Display the initial dialog
+    osascript -e "display dialog \"Your Mac will be rebooted in 15 minutes. Please save your work.\" with title \"Reboot Warning - $current_date\" buttons {\"OK\"} default button \"OK\"" &
+
+    # Wait for 15 minutes (900 seconds)
+    sleep 900
+
+    # Display the sign out warning dialog
+    osascript -e "display dialog \"You are about to be signed out.\" with title \"Sign Out Warning\" buttons {\"OK\"} default button \"OK\"" &
+
+    # Log the new dialog display
+    log "Sent user popup that they are about to be signed off."
+
+    # Wait for 30 seconds
+    sleep 30
+
+    # Log the reboot action
+    log "Script Forced Reboot"
+    log "********************************************************************************************************"
+    sudo shutdown -r now
+    log "********************************************************************************************************"
+    exit 0
+}
+
+# Get the current date and time in the desired format
+current_date=$(date +"%m/%d/%Y %I:%M %p")
+current_day=$(date +"%u") # Day of the week (1 = Monday, 7 = Sunday)
+
+# Calculate the number of minutes since midnight
+minutes_since_midnight=$(($(date +%H) * 60 + $(date +%M)))
+
+# Get the system uptime in seconds and convert to minutes
+uptime_seconds=$(sysctl -n kern.boottime | awk '{print $4}' | sed 's/,//')
+current_time_seconds=$(date +%s)
+uptime_minutes=$(( (current_time_seconds - uptime_seconds) / 60 ))
+
+# Log the script start
+log "Script started"
+
+
+# Check if it's Saturday (6), between 299 and 360 minutes since midnight, and the system has been up for more than 2.5 hours (150 minutes)
+if [ "$current_day" -eq 6 ] && [ "$minutes_since_midnight" -ge 299 ] && [ "$minutes_since_midnight" -le 360 ] && [ "$uptime_minutes" -gt 150 ]; then
+    # Log the conditions met
+    log "Conditions met: Performing reboot sequence"
+    perform_reboot
+else
+    # Log the conditions not met
+    log "Exiting script as computer rebooted less than 2.5 hours ago, it is not Saturday, or script attempted to run outside window."
+    log "********************************************************************************************************"
+    exit 0
+fi
