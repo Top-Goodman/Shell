@@ -1,0 +1,116 @@
+#!/bin/bash
+
+#Version History:
+# v1.4 Added version history to script and changed Year to be when .AppleSetupDone created for when SetupAssistant ended. To be able to retroacitvly run script and get proper year, instead of script run year.
+# v1.3 While loop variable did not exist in scope of nested loop call to rest of script. So have that read via process substitution <<
+# v1.2 Switched loop to a nested loop in case multiple groups are found in plist that match search criteria ("IT Users" matches, yet "IT" isn't a region, so my uReg ends up being an array of strings when I was treating it like a single string)
+# v1.1 Adding logic to detect if expected Kerberos information exists, otherwise throw error and exit. Might have corrupted my Jamf inventory record during desting.
+# v1.0 "-AD" for Apple Desktops and "-AL" for Apple Laptops and fixed enumeration for expected regions array ("AU" "CH" "CT" "DC" "HN" "LA" "MB" "NY" "NJ")
+# v0.5 Added logging A for Apple, AD for apple Desktop
+# v0.4 Added logic for matching Windows hostnames (instead of prompting)
+# v0.1 Set hostname to Serial (will still be used, just this will be after Jamf Connect Kerberos compeltes)
+
+# Created by Goodman, Spencer sometime before 12/3/24
+# Requires Kerberos information in ~/Library/Preferences/com.jamf.connect.state.plist
+# For User ShortName (Windows username) and AD group regions (2 Letter state)
+# Parses jamf connect user plist for ad group information. uses this for locaiton
+# 
+
+version="v1.4"
+log_file="/private/var/log/FriendlyHostname.log"
+
+log_message() {
+    local message="$1"
+    local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
+    echo "[$timestamp] $message" >> "$log_file"
+    echo "[$timestamp] $message"
+}
+
+log_message "************************* Script Begin. Version: $version *************************"
+
+# Get current logged in User
+curUser=$(stat -f "%Su" /dev/console)
+log_message "Current logged in user: $curUser"
+
+# Get Year
+#year=$(date +"%y")
+year=$(stat -f "%SB" /var/db/.AppleSetupDone | awk '{print $4}' | cut -c 3-4)
+
+# Get User Short Name
+USN=$(defaults read /Users/$curUser/Library/Preferences/com.jamf.connect.state.plist UserShortName)
+if [ -z "$USN" ]; then
+  log_message "Error: User Short Name is empty."
+  exit 1
+fi
+log_message "User shortname: $USN"
+
+# Get the model name of the computer
+model_name=$(system_profiler SPHardwareDataType | grep "Model Name" | awk -F ": " '{print $2}')
+log_message "Computer model: $model_name"
+
+# Get region of user. Find all Azure groups in Jamf Connect State Plist that contain the word "Users" and remove any groups that say Azure. Select first word of each match (Remove word Users)
+uReg=$(defaults read /Users/$curUser/Library/Preferences/com.jamf.connect.state.plist UserGroups| tr -d '"'|grep Users| grep -v "Azure"| awk -F " " '{print $1}')
+if [ -z "$uReg" ]; then
+  log_message "Error: User Region is empty."
+  exit 1
+fi
+#!/bin/bash
+
+log_message "$USN appears to be a member of $uReg"
+
+# Use expReg (can rename) to hold array to match. First match item in found user groups pulled from Azure (via Jamf Connect state UserGroups) is marked as item to use to contruct variable
+# Check region is one of expected values
+expReg=("AA" "BB" "CC" "DD" "EE" "FF" "GG" "HH" "II")
+
+# Empty variable for matched Regions
+mReg=""
+AReg=""
+
+# Initialize the flag variable
+foundMatch=false
+
+# Nested Loop to check for multiple values of User Region against Expected Regions. Exits at first match.
+while IFS= read -r aReg; do
+  echo "Processing aReg: $aReg"
+  
+  # Check matched region against values in expected regions list and make sure a match exists
+  for reg in "${expReg[@]}"; do
+    if [[ "$aReg" == "$reg" ]]; then
+      mReg=$reg
+      AReg=$aReg
+      echo "Match found: $mReg - $AReg"
+      foundMatch=true
+      break
+    fi
+  done
+  
+  # Break the outer loop if a match was found
+  if [ "$foundMatch" = true ]; then
+    break
+  fi
+done < <(echo "$uReg")
+
+# Check value of matched Region
+echo $mReg
+echo $AReg
+log_message "Matched Region: $mReg, is User Region:$AReg"
+
+# Apple Laptop, or Apple Desktop. Used to denote against Windows comptuers that have similar naming scheme (sans "A").
+# Check if the model name contains "MacBook"
+if [[ $model_name == *"MacBook"* ]]; then
+    sn="$mReg-$USN-AL$year"
+else
+    sn="$mReg-$USN-AD$year"
+fi
+
+log_message "Setting comptuer hostname to $sn"
+
+# Set the ComputerName, HostName and LocalHostName
+scutil --set ComputerName $sn
+scutil --set HostName $sn
+scutil --set LocalHostName $sn
+dscacheutil -flushcache
+
+# Set change to Jamf as well
+log_message "Updating Jamf computer record"
+/usr/local/bin/jamf setComputerName -name $sn
