@@ -1,0 +1,22 @@
+filePath="${4}" #Wallpaper File Path will need to be a file already on the computer. Do not need to reset Dock for this to take effect
+
+# Check if the file exists
+if [ ! -f "$filePath" ]; then
+    echo "File path not found: $filePath"
+    exit 1
+fi
+
+# Get the currently logged-in user
+currentUser=$(stat -f "%Su" /dev/console)
+
+# Run the osascript command as the logged-in user
+sudo launchctl asuser $(id -u "$currentUser") sudo -u "$currentUser" osascript -e 'tell application "System Events" to set picture of every desktop to "$filePath"'
+
+# Check for errors and exit accordingly
+if [ $? -eq 0 ]; then
+    echo "Desktop background set successfully."
+    exit 0
+else
+    echo "Failed to set desktop background."
+    exit 1
+fi
