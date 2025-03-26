@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Get the list of preferred Wi-Fi networks
+wifiList=$(networksetup -listpreferredwirelessnetworks en0 | tail -n +2 | grep -v "KelleyMac")
+
+# Remove leading and trailing whitespace from each line and format for AppleScript
+wifiListFormatted=$(echo "$wifiList" | awk '{$1=$1; print}' | sed 's/^/"/;s/$/"/' | paste -sd, -)
+
+# Run the AppleScript and capture the output
+selected_item=$(osascript <<EOF
+set itemList to {$wifiListFormatted}
+set selectedItem to choose from list itemList with prompt "Select an item:"
+if selectedItem is false then
+    return "No item selected"
+else
+    return selectedItem
+end if
+EOF
+)
+
+# Print the selected item
+echo "You selected: $selected_item"
+
+# Remove the selected item if not "No item selected"
+if [ "$selected_item" != "No item selected" ]; then
+    # Remove quotes from the selected item
+    selected_item=$(echo "$selected_item" | sed 's/^"//;s/"$//')
+    
+    # Disconnect from the current Wi-Fi network
+    networksetup -setairportpower en0 off
+    sleep 2
+    networksetup -setairportpower en0 on
+    
+    # Remove the selected network
+    networksetup -removepreferredwirelessnetwork en0 "$selected_item"
+    echo "Removed Wi-Fi network: $selected_item"
+fi
