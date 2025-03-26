@@ -52,6 +52,7 @@
 # Revised by: Top-Goodman (Annoying person)
 #
 # Revision History
+# 2025-03-26: Changed text handling in upload_file_with_timestamp as files with spaces in path were not being processed as expected in logging,copy\rename, and upload.
 # 2025-03-24: Removed timestamp variable, it wasn't being used. Functions have local timestamps. Added hostname to begining of uploaded file name for diffentiating downloaded logs, and compacted timestamp of uploaded file name to shorten a bit.
 # 2025-03-20: Expanded log processing funciton to handle /Users differently. DO NOT TYPE USERNAME if you want /Users/user/Library type /Users/Library. Function will check all users on computer and test each path using each found user.
 # 2025-03-19: Added function to check for existing attachments, log them, and delete them. This only runs if the purge variable is set (not empty). I could probably expand this logic to only run for specific file types. Yet not doing that today...
@@ -62,7 +63,7 @@
 # 2023-11-30: Added support for bearer auth and invalidating bearer token once done.
 # 2020-12-01: Added support for macOS Big Sur
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-version="v1.4"
+version="v1.5"
 
 ## User Variables
 ## Ensure not to include the / at the end of the JamfProURL parameter. ex https://instance.jamfcloud.com is the parameter NOT https://instance.jamfcloud.com/
@@ -188,13 +189,13 @@ upload_file_with_timestamp() {
     local newFilePath="${dir}/${compHostName}_${name}_${timestamp}.${ext}"
     
     # Rename the file
-    cp "$filePath" "$newFilePath"
+    cp "${filePath}" "${newFilePath}"
     
-    log "Renaming $filePath to $newFilePath"
-log "Uploading $newFilePath to $jamfProURL - Computer $computerID"
+    log "Renaming \"$filePath\" to \"$newFilePath\""
+log "Uploading \"$newFilePath\" to $jamfProURL - Computer $computerID"
 curl -X POST "$jamfProURL:443/JSSResource/fileuploads/computers/id/$computerID" -H "Authorization: Bearer ${accessToken}" -F name=@"$newFilePath"
 sleep 1
-rm "$newFilePath"
+rm "${newFilePath}"
 }
 
 # Log the script start
@@ -225,7 +226,7 @@ logArray=()
 
 log "Processing provided paths"
 process_log_files logArray "$logFiles"
-log "Processing complete!"
+log "Processing complete"
 
 # Print the contents of logArray
 #log "Files processed ${logArray[@]}"
@@ -233,7 +234,7 @@ log "Processing complete!"
 # Upload file(s) to computer attachments
 for file in "${logArray[@]}"; do
      if [[ $file == *.log || $file == *.txt || $file == *.plist ]]; then
-          upload_file_with_timestamp $file
+          upload_file_with_timestamp "${file}"
      fi
 done
 
