@@ -1,0 +1,5 @@
+#Make logged in user admin (requires admin to run)
+sudo dscl . -merge /Groups/admin GroupMembership $3
+
+#Remove admin from logged on user
+sudo dseditgroup -o edit -d $(stat -f "%Su" /dev/console) -t user admin
