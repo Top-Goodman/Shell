@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Allow non-admin users to manage Wi-Fi settings
+
+# Remove the requirement for admin credentials to change Wi-Fi settings
+sudo /usr/bin/security authorizationdb write com.apple.wifi allow
+# to reverse: /usr/bin/security authorizationdb write com.apple.wifi authenticate-admin
+
+sudo /usr/bin/security authorizationdb write system.preferences.network allow
+sudo /usr/bin/security authorizationdb write system.services.systemconfiguration.network allow
+
+sudo /usr/libexec/airportd prefs RequireAdminNetworkChange=NO RequireAdminIBSS=NO
+
+# Restart Wifi
+networksetup -setnetworkserviceenabled Wi-Fi off
+networksetup -setnetworkserviceenabled Wi-Fi on
