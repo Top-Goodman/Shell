@@ -1,0 +1,20 @@
+#!/bin/bash
+# Wait for 2 minute to let account creation finish
+sleep 120
+
+# Intended to be used with policy that creates this admin account.
+
+uName="${4}" # username
+
+# Convert to lowercase
+uName=$(echo "$uName" | tr '[:upper:]' '[:lower:]')
+
+# Check if it begins with /users and remove it (since we converted to lowercase /Users or /users will both now be /users
+if [[ "$uName" == /users/* ]]; then
+  uName=${uName#/users/}
+fi
+
+# Hide account from System Preferences and Login Screen
+sudo dscl . create /Users/$uName IsHidden 1
+# Hide Home folder
+sudo chflags hidden /Users/$uName 
