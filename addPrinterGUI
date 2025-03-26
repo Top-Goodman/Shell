@@ -1,0 +1,275 @@
+#!/bin/bash
+
+version="v1.2"
+log_file="/private/var/log/KDWaddPrint.log"
+
+log_message() {
+    local message="$1"
+    local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
+    echo "[$timestamp] $message" >> "$log_file"
+    echo "[$timestamp] $message"
+}
+
+# Function to display the main menu and get the selection
+display_main_menu() {
+  osascript <<EOF
+    set actionList to {"Add", "Remove"}
+    set actionChoice to choose from list actionList with prompt "Select an action:"
+    if actionChoice is false then
+      return "Cancelled"
+    else
+      return item 1 of actionChoice
+    end if
+EOF
+}
+
+# Function to display the first menu and get the selection
+display_first_menu() {
+  osascript <<EOF
+    set cityList to {"New York", "Washington DC", "Chicago", "Parsippany", "Stamford", "Los Angeles", "Houston", "Go Back"}
+    set cityChoice to choose from list cityList with prompt "Select a city:"
+    if cityChoice is false then
+      return "Cancelled"
+    else
+      return item 1 of cityChoice
+    end if
+EOF
+}
+
+# Function to display the second menu based on the first selection
+display_second_menu() {
+  local city="$1"
+  osascript <<EOF
+    if "$city" is "New York" then
+      set itemList to {"NY01", "NY02", "NY03", "Go Back"}
+    else if "$city" is "Houston" then
+      set itemList to {"HN01", "HN02", "HN03", "Go Back"}
+    else if "$city" is "Washington DC" then
+      set itemList to {"DC01", "DC02", "DC03", "Go Back"}
+    else if "$city" is "Chicago" then
+       set itemList to {"CH01", "CH02", "CH03", "Go Back"}
+    else if "$city" is "Parsippany" then
+       set itemList to {"NJ01", "NJ02", "NJ03", "Go Back"}
+    else if "$city" is "Stamford" then
+      set itemList to {"CT01", "CT02", "CT03", "Go Back"}
+    else if "$city" is "Los Angeles" then
+      set itemList to {"LA01", "LA02", "LA03", "Go Back"}
+    end if
+    set itemChoice to choose from list itemList with prompt "Select an item:"
+    if itemChoice is false then
+      return "Cancelled"
+    else
+      return item 1 of itemChoice
+    end if
+EOF
+}
+
+# Function to remove a printer
+remove_printer() {
+  # Collect printer names
+  printer_names=$(lpstat -p | awk '{print $2}')
+  # Pass the printer names to AppleScript and store the selection
+  selected_printer=$(osascript <<EOF
+set printerNames to "$printer_names"
+set printerList to paragraphs of printerNames & {"Go Back"}
+set selectedPrinter to choose from list printerList with prompt "Select a printer to delete:"
+if selectedPrinter is false then
+    return ""
+else
+    return item 1 of selectedPrinter
+end if
+EOF
+)
+
+  # Check if a printer was selected
+  if [ -n "$selected_printer" ]; then
+  log_message "Selected printer for deletion: $selected_printer"
+    if [ "$selected_printer" == "Go Back" ]; then
+    log_message "User chose to go back from the printer deletion menu."
+      return 1
+    fi
+    # Confirm deletion
+    confirm=$(osascript <<EOF
+display dialog "Are you sure you want to delete the printer '$selected_printer'?" buttons {"Cancel", "Delete"} default button "Cancel"
+if button returned of result is "Delete" then
+    return "Yes"
+else
+    return "No"
+end if
+EOF
+)
+    log_message "User confirmation for deletion: $confirm"
+    if [ "$confirm" == "Yes" ]; then
+      # Delete the selected printer
+      lpadmin -x "$selected_printer"
+      log_message "Printer '$selected_printer' has been deleted."
+    else
+    log_message "Deletion of printer '$selected_printer' cancelled."
+    fi
+  else
+  log_message "No printer was selected for deletion."
+  fi
+}
+
+# Main script logic
+log_message "************************* Script Begin. Version: $version *************************"
+while true; do
+  # Get the main menu selection
+  action=$(display_main_menu)
+    log_message "Main menu selection: $action"
+  if [ "$action" == "Cancelled" ]; then
+  log_message "Selection cancelled."
+    exit 1
+  elif [ "$action" == "Add" ]; then
+    while true; do
+      # Get the first selection
+      city=$(display_first_menu)
+      log_message "City selection: $city"
+      if [ "$city" == "Cancelled" ]; then
+      log_message "Selection cancelled."
+        exit 1
+      elif [ "$city" == "Go Back" ]; then
+      log_message "User chose to go back from the city selection menu."
+        break
+      fi
+
+      while true; do
+        # Get the second selection
+        item=$(display_second_menu "$city")
+          log_message "Item selection: $item"
+        if [ "$item" == "Cancelled" ]; then
+          log_message "Selection cancelled."
+          exit 1
+        elif [ "$item" == "Go Back" ]; then
+        log_message "User chose to go back from the item selection menu."
+          break
+        else
+          # Return the variables to the bash script
+          printer="$item"
+case "$item" in
+  "NY01")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "NY02")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "NY03")
+    ip="10.1.1.101"
+    protocol="LPD"
+    ;;
+  "HN01")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "HN02")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "HN03")
+    ip="10.1.1.101"
+    protocol="LPD"
+    ;;
+  "DC01")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "DC02")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "DC03")
+    ip="10.1.1.101"
+    protocol="LPD"
+    ;;
+  "CH01")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "CH02")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "CH03")
+    ip="10.1.1.101"
+    protocol="LPD"
+    ;;
+  "NJ01")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "NJ02")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "NJ03")
+    ip="10.1.1.101"
+    protocol="LPD"
+    ;;
+  "CT01")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "CT02")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "CT03")
+    ip="10.1.1.101"
+    protocol="LPD"
+    ;;
+  "LA01")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "LA02")
+    ip="10.1.1.101"
+    protocol="IPP"
+    ;;
+  "LA03")
+    ip="10.1.1.101"
+    protocol="LPD"
+    ;;
+            *)
+              ip="${item} IP"
+              protocol="IPP"
+              ;;
+          esac
+
+          log_message "Selected Printer: $printer"
+          log_message "IP Address: $ip"
+          log_message "Protocol: $protocol"
+
+
+        # Add the printer using lpadmin with the selected protocol
+          if [ "$protocol" == "IPP" ]; then
+            sudo lpadmin -p "$printer" -L "$ip" -E -v ipp://"$ip" -P /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/PrintCore.framework/Resources/Generic.ppd -o printer-is-shared=false
+          log_message "Added printer $printer with IPP protocol at IP $ip"
+          elif [ "$protocol" == "LPD" ]; then
+            sudo lpadmin -p "$printer" -L "$ip" -E -v lpd://"$ip" -P /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/PrintCore.framework/Resources/Generic.ppd -o printer-is-shared=false
+          log_message "Added printer $printer with LPD protocol at IP $ip"
+          fi
+
+          # Enable duplex using lpadmin
+          sudo lpadmin -p "$printer" -o Duplex=DuplexNoTumble
+          sudo lpadmin -p "$printer" -o APOptionalDuplexer=True
+          log_message "Enabled duplex for printer $printer"
+
+
+          log_message "Printer $printer added successfully with IP $ip and protocol $protocol."
+          exit 0
+        fi
+      done
+    done
+  elif [ "$action" == "Remove" ]; then
+    while true; do
+      remove_printer
+      if [ $? -eq 1 ]; then
+        break
+      else
+        exit 0
+      fi
+    done
+  fi
+done
