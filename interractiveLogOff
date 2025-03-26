@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# AppleScript to display the initial dialog
+action=$(osascript <<EOF
+display dialog "A log out or reboot is needed for change to take effect. Would you like to reboot now?" buttons {"Log Off", "Reboot", "Not Now"} default button "Not Now" with title "KelleyDrye"
+EOF
+)
+# Extract the button returned
+action=$(echo "$action" | awk -F':' '{print $2}' | xargs)
+
+# Check the user's response
+if [ "$action" != "Not Now" ]; then
+    # AppleScript to display the second dialog
+    confirm=$(osascript <<EOF
+    display dialog "Please make sure to save and close all open files and documents before continuing." buttons {"$action", "Not Now"} default button "Not Now" with title "KelleyDrye"
+EOF
+    )
+
+# Run Policy now, since logging out and reboot happen before the call to update inventory action will be called.
+sudo jamf recon
+
+    # Extract the button returned
+    confirm=$(echo "$confirm" | awk -F':' '{print $2}' | xargs)
+
+    # Perform the action based on the user's choice
+    if [ "$confirm" = "$action" ]; then
+        if [ "$action" = "Reboot" ]; then
+           sudo reboot
+        elif [ "$action" = "Log Off" ]; then
+           osascript -e 'tell application "loginwindow" to «event aevtrlgo»'
+        fi
+    fi
+fi
