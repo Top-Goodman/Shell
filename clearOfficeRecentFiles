@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Follow the symlink to the database file
+DB_FILE=$(sudo readlink "/Users/`stat -f "%Su" /dev/console`/Library/Group Containers/UBF8T346G9.Office/MicrosoftRegistrationDB.reg")
+
+# Define the SQLite3 command
+SQL_COMMAND="Delete from HKEY_CURRENT_USER_values where name like '%File%';"
+
+# Run the SQLite3 command against the database file
+sudo sqlite3 "$DB_FILE" "$SQL_COMMAND"
