@@ -52,6 +52,7 @@
 # Revised by: Top-Goodman (Annoying person)
 #
 # Revision History
+# 2025-03-26: Added Verbose flag. Currently this will output the entire computer response from API call and output the array created by process_log_files()
 # 2025-03-26: Changed text handling in upload_file_with_timestamp as files with spaces in path were not being processed as expected in logging,copy\rename, and upload.
 # 2025-03-24: Removed timestamp variable, it wasn't being used. Functions have local timestamps. Added hostname to begining of uploaded file name for diffentiating downloaded logs, and compacted timestamp of uploaded file name to shorten a bit.
 # 2025-03-20: Expanded log processing funciton to handle /Users differently. DO NOT TYPE USERNAME if you want /Users/user/Library type /Users/Library. Function will check all users on computer and test each path using each found user.
@@ -63,7 +64,7 @@
 # 2023-11-30: Added support for bearer auth and invalidating bearer token once done.
 # 2020-12-01: Added support for macOS Big Sur
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-version="v1.5"
+version="v1.6"
 
 ## User Variables
 ## Ensure not to include the / at the end of the JamfProURL parameter. ex https://instance.jamfcloud.com is the parameter NOT https://instance.jamfcloud.com/
@@ -79,6 +80,7 @@ logFiles="${7}" #"/private/var/log/install.log*,/private/var/log/jamf.log*,/priv
 salt="${8}" #"<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 key="${9}" #"<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 purge="${10}" #Leave null to leave all attachments in inventory. Anything here will erase ALL prior existing attachments for comptuer running this script.
+verbose="${11}" #Populate this variable to output extra logging. Leave null to run normally. This can drastically increase amount of data logged, please use only if needed.
 log_file="/private/var/log/uploadLogsAPI.log"
 
 ## System Variables
@@ -198,6 +200,10 @@ sleep 1
 rm "${newFilePath}"
 }
 
+if [[ -n "$verbose" ]];then
+    version="${version}-verbose"
+fi
+
 # Log the script start
 log "Script started. Version:$version"
 log "Serial Number: $serial_number"
@@ -211,8 +217,10 @@ computer_id_response=$(curl --silent --request GET "${jamfProURL}/JSSResource/co
 --header "Authorization: Bearer ${accessToken}" \
 --header "Accept: application/json")
 
-# Print the response for debugging
-#log "Computer ID Response: $computer_id_response"
+if [[ -n "$verbose" ]];then
+     # Print the response for debugging
+     log "Computer ID Response: $computer_id_response"
+fi
 
 computerID=$(echo $computer_id_response | jq -r '.computer.general.id')
 log "Computer ID: $computerID"
@@ -228,8 +236,10 @@ log "Processing provided paths"
 process_log_files logArray "$logFiles"
 log "Processing complete"
 
-# Print the contents of logArray
-#log "Files processed ${logArray[@]}"
+if [[ -n "$verbose" ]];then
+     # Print the contents of logArray
+     log "Files processed ${logArray[@]}"
+fi
 
 # Upload file(s) to computer attachments
 for file in "${logArray[@]}"; do
