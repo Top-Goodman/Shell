@@ -1,5 +1,6 @@
 myLog() { 
     /bin/echo "`date`: $1" >> $logfile 
+    /bin/echo "`date`: $1"
     }
 
 		# Assignment of global variables
