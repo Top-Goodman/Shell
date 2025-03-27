@@ -1,6 +1,51 @@
 #!/bin/bash
 
-# Expectation is that a launchDaemon controls this for scheduling
+###########################################################################################################################
+# I know, I know. I should branch this off into a project or folder at this point and make these seperate files....
+# Expectation is that a launchDaemon controls this for scheduling. 
+# Technically, this can be done in Jamf with Client side Limitations, yet that assumes the devices are awake and connected to the internet already.pmset can help with some of that.
+# Below shows plist for Weekly Saturday at 5am. 
+# LaunchDaemons are similar to cron just for Mac. cron does exist on mac. crontab -e will open with vi editor.... I've always been more of a nano guy
+# Replace AAA with your companyName and Folder with a path to where the script lives.
+# The plist should exist in /Library/LaunchDaemons
+#
+#<?xml version="1.0" encoding="UTF-8"?>
+#<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+#<plist version="1.0">
+#<dict>
+#	<key>Label</key>
+#	<string>com.AAA.weeklyReboot</string>
+#	<key>ProgramArguments</key>
+#	<array>
+#		<string>/Library/Folder/AAA Reboot/localReboot.sh</string>
+#	</array>
+#	<key>StandardErrorPath</key>
+#	<string>/tmp/com.AAA.weeklyReboot.err</string>
+#	<key>StandardOutPath</key>
+#	<string>/tmp/com.AAA.weeklyReboot.out</string>
+#	<key>StartCalendarInterval</key>
+#	<dict>
+#		<key>Hour</key>
+#		<integer>5</integer>
+#		<key>Minute</key>
+#		<integer>0</integer>
+#		<key>Weekday</key>
+#		<integer>6</integer>
+#	</dict>
+#</dict>
+#</plist>
+#
+##  Load (Install) the launchDaemon, the unload first is only there to update an existing. For first time use, it is not needed. The pmset makes sure that sleeping computers are woken from wake to make sure this actually runs. Using wake as the action means powered off comptuers will stay powered off
+#sudo launchctl unload /Library/LaunchDaemons/com.KDW.weeklyReboot.plist
+#sudo launchctl load /Library/LaunchDaemons/com.KDW.weeklyReboot.plist
+#sudo pmset repeat wake S 04:50:00
+#
+## Unload (Uninstall) the launchDameon and delete the script and daemon. If using pmset for other tasks, might need to be more specific than just repeat cancel as arguments. This will clear all pmset values.
+#launchctl unload /Library/LaunchDaemons/com.AAA.weeklyReboot.plist
+#rm /Library/LaunchDaemons/com.AAA.weeklyReboot.plist 
+#rm -drf /Library/Folder/AAA\ Reboot/
+#sudo pmset repeat cancel
+###########################################################################################################################
 
 # Define the log file
 log_file="/private/var/log/localReboot.log"
