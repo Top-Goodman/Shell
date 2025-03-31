@@ -1,0 +1,56 @@
+# Function to move file and set permissions
+move_file() {
+    source=$1
+    destination=$2
+    user=$3
+    perm=$4	
+    # Ensure the destination directory exists
+    if [ ! -d "$destination" ]; then
+        mkdir -p "$destination"
+    fi
+    # Move the file
+    mv "$source" "$destination"
+# Set Permissions (400 = Read to owner only)
+chmod $perm "$destination/$(basename "$source")"
+# Set ownership
+chown -R $user:staff "$destination/$(basename "$source")"
+ }
+# Usage
+activeUser=$( stat -f "%Su" /dev/console )
+move_file "/Library/OrgFolder/" "/Users/$activeUser/" $activeUser 600
+
+log() {
+    local message="$1"
+    local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
+    echo "[$timestamp] $message" >> "$log_file"
+    echo "[$timestamp] $message"
+}
+#usage
+log "Hello World"
+
+# Function to retrieve access token for Jamf API
+get_access_token() {
+    jamfProURL=$1
+    jamfProUser=$2
+    jamfProPass=$3
+  curl --request POST \
+    --url "$jamfProURL/api/oauth/token" \
+    --header 'Content-Type: application/x-www-form-urlencoded' \
+    --data-urlencode "client_id=$jamfProUser" \
+    --data-urlencode 'grant_type=client_credentials' \
+    --data-urlencode "client_secret=$jamfProPass" | jq -r '.access_token'
+}
+#usage
+get_access_token "https://organizaiton.jamfcloud.com" "clientID" "clientSecret"
+
+
+# Function to URL-encode a string
+url_encode_spaces_commas() {
+  local string="${1}"
+  local encoded="${string// /%20}"  # Replace spaces with %20
+  encoded="${encoded//,/%2C}"       # Replace commas with %2C
+  echo "${encoded}"
+}
+#Usage
+url_encode_spaces_commas "This is text, I think"
+#Output : This%20is%20text%2C%20I%20think
