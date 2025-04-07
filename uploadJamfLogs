@@ -52,6 +52,7 @@
 # Revised by: Top-Goodman (Annoying person)
 #
 # Revision History
+# 2025-04-07: In process_log_files, switched to "do while" instead of "for loop" and set maxdepth 1 to prevent wildcard handling entering subfolders. Added counts of files found and files uploaded\skipped for logging. Moved a lot of the output that existed before into the verbose run of script.
 # 2025-03-26: Added Verbose flag. Currently this will output the entire computer response from API call and output the array created by process_log_files()
 # 2025-03-26: Changed text handling in upload_file_with_timestamp as files with spaces in path were not being processed as expected in logging,copy\rename, and upload.
 # 2025-03-24: Removed timestamp variable, it wasn't being used. Functions have local timestamps. Added hostname to begining of uploaded file name for diffentiating downloaded logs, and compacted timestamp of uploaded file name to shorten a bit.
@@ -64,7 +65,7 @@
 # 2023-11-30: Added support for bearer auth and invalidating bearer token once done.
 # 2020-12-01: Added support for macOS Big Sur
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-version="v1.6"
+version="v1.7"
 
 ## User Variables
 ## Ensure not to include the / at the end of the JamfProURL parameter. ex https://instance.jamfcloud.com is the parameter NOT https://instance.jamfcloud.com/
@@ -80,7 +81,7 @@ logFiles="${7}" #"/private/var/log/install.log*,/private/var/log/jamf.log*,/priv
 salt="${8}" #"<salt>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 key="${9}" #"<passkey>" # see for more inforamtion https://github.com/kc9wwh/logCollection/wiki/Using-Encrypted-Strings
 purge="${10}" #Leave null to leave all attachments in inventory. Anything here will erase ALL prior existing attachments for comptuer running this script.
-verbose="${11}" #Populate this variable to output extra logging. Leave null to run normally. This can drastically increase amount of data logged, please use only if needed.
+verbose="${11}" # Populate this variable with anything to output extra logging. Leave null to run normally. This can drastically increase amount of data logged, please use only if needed
 log_file="/private/var/log/uploadLogsAPI.log"
 
 ## System Variables
@@ -126,7 +127,9 @@ delete_ALL_attachments() {
     local id_array=($(echo "$attachmentIDs" | grep -oE '[0-9]+'))
 
     for i in "${!id_array[@]}"; do
-        echo "Deleting File: ${filename_array[$i]} - ID: ${id_array[$i]}"
+    if [[ -n "$verbose" ]];then
+        log "Deleting File: ${filename_array[$i]} - ID: ${id_array[$i]}"
+        fi
         curl -X DELETE "$jamfProURL:443/api/v1/computers-inventory/$computerID/attachments/${id_array[$i]}" \
             -H "Authorization: Bearer ${accessToken}"
     done
@@ -149,13 +152,22 @@ process_log_files() {
                 fullPath="${userFolder}${logFile#*/Users/*}"
                 if [[ $fullPath == *\** ]]; then
                     # If the fullPath contains a wildcard, use globbing to find matching files
-                    log "Evaluating \"$fullPath\""
-                    for evalFile in $(find "${fullPath%/*}" -name "${fullPath##*/}"); do
+                    if [[ -n "$verbose" ]];then
+                    # Print path being evaluated.
+                    log "Processing \"$fullPath\""
+                    fi
+                    for evalFile in $(find "${fullPath%/*}" -maxdepth 1 -name "${fullPath##*/}"); do
+                    if [[ -n "$verbose" ]];then
+                    # Print the filepath added to output array
                         log "adding $evalFile to log array"
+                        fi
                         eval "$logArrayName+=('$evalFile')"
                     done
                 elif [[ -e $fullPath ]]; then
+                if [[ -n "$verbose" ]];then
+                # Print the filepath added to output array
                     log "adding $fullPath to log array"
+                    fi
                     eval "$logArrayName+=('$fullPath')"
                 else
                     log "File $fullPath does not exist"
@@ -163,14 +175,23 @@ process_log_files() {
             done
         elif [[ $logFile == *\** ]]; then
             # If the logFile contains a wildcard, use globbing to find matching files
-            log "Evaluating \"$logFile\""
-            for evalFile in $(find "${logFile%/*}" -name "${logFile##*/}"); do
-                log "adding $evalFile to log array"
+            if [[ -n "$verbose" ]];then
+            # Print path being evaluated.
+            log "Processing \"$logFile\""
+            fi
+            while IFS= read -r -d '' evalFile; do
+            if [[ -n "$verbose" ]];then
+            # Print the filepath added to output array
+                log "adding \"$evalFile\" to log array"
+                fi
                 eval "$logArrayName+=('$evalFile')"
-            done
+            done < <(find "${logFile%/*}" -maxdepth 1 -name "${logFile##*/}" -print0)
         else
             # If no wildcard and not in /Users, add the full path to logArray
+            if [[ -n "$verbose" ]];then
+            # Print the filepath added to output array
             log "adding $logFile to log array"
+            fi
             eval "$logArrayName+=('$logFile')"
         fi
     done
@@ -192,11 +213,15 @@ upload_file_with_timestamp() {
     
     # Rename the file
     cp "${filePath}" "${newFilePath}"
-    
+    if [[ -n "$verbose" ]];then
+    # Print the modified filepaths for uploading
     log "Renaming \"$filePath\" to \"$newFilePath\""
+    # Upload this new file
 log "Uploading \"$newFilePath\" to $jamfProURL - Computer $computerID"
+fi
 curl -X POST "$jamfProURL:443/JSSResource/fileuploads/computers/id/$computerID" -H "Authorization: Bearer ${accessToken}" -F name=@"$newFilePath"
 sleep 1
+# delete this new file
 rm "${newFilePath}"
 }
 
@@ -205,7 +230,7 @@ if [[ -n "$verbose" ]];then
 fi
 
 # Log the script start
-log "Script started. Version:$version"
+log "Script started. Version: $version"
 log "Serial Number: $serial_number"
 log "Operating System: $osMajor.$osMinor" 
 
@@ -218,7 +243,7 @@ computer_id_response=$(curl --silent --request GET "${jamfProURL}/JSSResource/co
 --header "Accept: application/json")
 
 if [[ -n "$verbose" ]];then
-     # Print the response for debugging
+     # Print the API computer response for debugging
      log "Computer ID Response: $computer_id_response"
 fi
 
@@ -233,20 +258,50 @@ fi
 logArray=()
 
 log "Processing provided paths"
-process_log_files logArray "$logFiles"
-log "Processing complete"
-
+# Print all the paths provided.
 if [[ -n "$verbose" ]];then
-     # Print the contents of logArray
-     log "Files processed ${logArray[@]}"
+    # Get the number of the array index using !
+     for path in "${!logFiles[@]}"; do
+     # Print the index followed by the array value at that index 
+     log "Input path $((path + 1)) provided: ${logFiles[$path]}"
+     done
 fi
+process_log_files logArray "$logFiles"
+log "Processing complete, total items to evaluate: ${#logArray[@]}"
+
+# Initialize the countFile variable
+countArray=()
+unCountArray=()
+
 
 # Upload file(s) to computer attachments
+Log "Evaluating files for upload. This may take a few minutes. Please wait..."
 for file in "${logArray[@]}"; do
+if [[ -n "$verbose" ]];then
+log "Evaluating file: $file"
+fi
      if [[ $file == *.log || $file == *.txt || $file == *.plist ]]; then
           upload_file_with_timestamp "${file}"
+          countArray+=("$file")
+          else
+                    unCountArray+=("$file")
      fi
 done
 
 # Log the script end
-log "Script finished. Version:$version"
+log "Uploaded File(s): ${#countArray[@]}"
+if [[ -n "$verbose" ]];then
+# Print all the paths uploaded.
+     for uploadFile in "${countArray[@]}"; do
+     log "Uploaded: ${uploadFile}"
+     done
+fi
+log "Skipped File(s): ${#unCountArray[@]}"
+if [[ -n "$verbose" ]];then
+# Print all the paths skipped files not uploaded.
+     for skippedFile in "${unCountArray[@]}"; do
+     log "Skipped: ${skippedFile}"
+     done
+fi
+
+log "Script finished. Version: $version"
