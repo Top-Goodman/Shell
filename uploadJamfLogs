@@ -254,18 +254,21 @@ if [[ -n "$purge" ]];then
      delete_ALL_attachments "$jamfProURL" "$computerID" "$accessToken"
 fi
 
+log "Processing provided paths"
+if [[ -n "$verbose" ]]; then
+# Convert comma-separated list into an array
+IFS=',' read -r -a logFilesArray <<< "$logFiles"
+# Print all the paths provided.
+    # Get the number of the array index using !
+    for path in "${!logFilesArray[@]}"; do
+        # Print the index followed by the array value at that index 
+        log "Input path $((path + 1)) provided: ${logFilesArray[$path]}"
+    done
+fi
+
 # Initialize the logArray variable
 logArray=()
 
-log "Processing provided paths"
-# Print all the paths provided.
-if [[ -n "$verbose" ]];then
-    # Get the number of the array index using !
-     for path in "${!logFiles[@]}"; do
-     # Print the index followed by the array value at that index 
-     log "Input path $((path + 1)) provided: ${logFiles[$path]}"
-     done
-fi
 process_log_files logArray "$logFiles"
 log "Processing complete, total items to evaluate: ${#logArray[@]}"
 
