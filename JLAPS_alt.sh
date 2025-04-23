@@ -11,6 +11,10 @@
 #  Matches Admin Account to Mangement ID and gets password
 #  Copies password to clipboard
 #  Shows a dialog box with the Admin Account and current Laps Password
+# Revision History
+# 2025-04-23: Finally figured out a function to convert time zones using timezone offset of local date
+#
+version="v1.1"
 #
 # Replace these variables with your actual values
 client_id="<your client ID>"
@@ -43,8 +47,41 @@ log() {
     echo "[$timestamp] $message"
 }
 
+convert_to_local_time() {
+    # Original timestamp
+    timestamp="$1"
+
+    # Remove the milliseconds and 'Z'
+    datetime=$(echo $timestamp | sed 's/\..*Z//')
+
+    # Extract date and time components
+    year=$(echo $datetime | cut -d'-' -f1)
+    month=$(echo $datetime | cut -d'-' -f2)
+    day=$(echo $datetime | cut -d'-' -f3 | cut -d'T' -f1)
+    hour=$(echo $datetime | cut -d'T' -f2 | cut -d':' -f1)
+    minute=$(echo $datetime | cut -d':' -f2)
+    second=$(echo $datetime | cut -d':' -f3)
+
+    # Get the local time zone offset
+    timezone_offset=$(date +%z)
+    timezone_hour_offset=$(echo $timezone_offset | cut -c 2-3)
+    timezone_minute_offset=$(echo $timezone_offset | cut -c 4-5)
+    sign=$(echo $timezone_offset | cut -c 1)
+
+    # Calculate the total offset in minutes
+    total_offset=$((10#$timezone_hour_offset * 60 + 10#$timezone_minute_offset))
+    if [ "$sign" == "-" ]; then total_offset=$((total_offset * -1)); fi
+
+    # Adjust the time using the -v option
+    adjusted_time=$(date -u -j -f "%Y-%m-%dT%H:%M:%S" "$datetime" +"%Y-%m-%d %H:%M:%S")
+    local_time=$(date -v "${total_offset}M" -j -f "%Y-%m-%d %H:%M:%S" "$adjusted_time" +"%Y-%m-%d %H:%M:%S")
+
+    # Output converted time
+    echo "$local_time"
+}
+
 # Log the script start
-log "Script started"
+log "Script started. Version:$version"
 
 # Obtain the access token
 response=$(curl --silent --request POST "${jamf_url}/api/oauth/token" \
@@ -106,7 +143,7 @@ laps_response=$(curl --silent --request GET "${jamf_url}/api/v2/local-admin-pass
 laps_password=$(echo $laps_response | jq -r '.password')
 log "LAPS Password: $laps_password"
 
-# Optional: Copy the password to the clipboard (only works if script principal is logged on user
+# Optional: Copy the password to the clipboard (Might not work if script principal is not logged on user)
 echo "${laps_password}" | tr -d '\n'| pbcopy
 
 # Get the expiration date using the audit endpoint
@@ -114,7 +151,8 @@ audit_response=$(curl --silent --request GET "${jamf_url}/api/v2/local-admin-pas
 --header "Authorization: Bearer ${access_token}")
 
 laps_expiration=$(echo $audit_response | jq -r '.results[-1].expirationTime')
-log "LAPS Password Expiration (UTC): $laps_expiration"
+local_laps_expiration=$(convert_to_local_time "$laps_expiration")
+log "LAPS Password Expiration ($(date +%Z)): $local_laps_expiration"
 
 # Display the password and expiration date in a popup dialog box
-osascript -e "display dialog \"Computer Name: ${selected_computer}\nAdmin Username: ${username}\nCurrent LAPS Password: ${laps_password}\nExpiration Date (UTC): ${laps_expiration}\" buttons {\"OK\"} default button \"OK\""
+osascript -e "display dialog \"Computer Name: ${selected_computer}\nAdmin Username: ${username}\nCurrent LAPS Password: ${laps_password}\nExpiration Date ($(date +%Z)): ${local_laps_expiration}\" buttons {\"OK\"} default button \"OK\""
