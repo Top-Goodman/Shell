@@ -278,7 +278,7 @@ unCountArray=()
 
 
 # Upload file(s) to computer attachments
-Log "Evaluating files for upload. This may take a few minutes. Please wait..."
+log "Evaluating files for upload. This may take a few minutes. Please wait..."
 for file in "${logArray[@]}"; do
 if [[ -n "$verbose" ]];then
 log "Evaluating file: $file"
